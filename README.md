@@ -1,69 +1,91 @@
-# Luna's Library
+# 🌷 Luna's Library
 
-> Uma plataforma literária para descobrir, comprar e ler histórias originais.
+### Onde cada história encontra seu universo. ✦
 
-## Sobre o projeto
+A **Luna's Library** é uma plataforma literária criada para reunir histórias originais, universos, leitura digital e uma comunidade de leitores em um só lugar.
 
-A **Luna's Library** é uma plataforma literária criada para reunir livros, universos, comunidade e recursos de leitura em um só lugar.
+Um espaço pensado para transformar a experiência de ler em algo **acolhedor, bonito e especial**. ♡
 
-O projeto foi desenvolvido para oferecer uma experiência de leitura digital elegante, acolhedora e organizada, com uma identidade visual feminina e literária.
+---
 
-## Funcionalidades
+## ✦ Sobre a Luna's Library
 
-- Catálogo de livros
-- Página individual para cada livro
-- Compra de livros
-- Biblioteca/estante pessoal
-- Leitor de capítulos
-- Controle de progresso de leitura
-- Prévia gratuita de capítulos
-- Comunidade com publicações, comentários e curtidas
-- Universos literários
-- Quizzes
-- Suporte a temas claro, escuro e sépia
-- Conta do leitor
-- Configurações e gerenciamento da conta
-- Área administrativa
-- Gerenciamento de livros e capítulos
-- Gerenciamento de pedidos e pagamentos
-- Controle de acesso aos livros adquiridos
-- Pagamento via Pix com confirmação administrativa
-- Suporte planejado para diferentes idiomas
+A plataforma reúne:
 
-## Livros
+- 📚 Livros e histórias originais
+- 🌷 Catálogo literário
+- ✦ Universos conectados às histórias
+- 📖 Leitor digital
+- ♡ Estante pessoal
+- ✎ Progresso de leitura
+- 💬 Comunidade de leitores
+- 📝 Quizzes
+- 🌙 Temas claro, escuro e sépia
+- 👤 Conta e configurações do leitor
+- ✧ Área administrativa para gerenciamento da plataforma
 
-O catálogo inicial conta com obras originais da autora, incluindo:
+---
 
-- **Depois de Nós**
-- **Agora, Sobre Nós**
-- **Entre Gigantes**
+## 📚 Livros
 
-Novos livros e universos poderão ser adicionados conforme o projeto crescer.
+Entre as obras presentes na Luna's Library estão:
 
-## Gêneros
+**Depois de Nós**  
+**Agora, Sobre Nós**  
+**Entre Gigantes**
+
+Novas histórias poderão ser adicionadas conforme a biblioteca crescer.
+
+---
+
+## ♡ Gêneros
 
 Os gêneros iniciais incluem:
 
 - Romance
 - Romance Cristão
 
-Novos gêneros poderão aparecer conforme novas obras forem adicionadas ao catálogo.
+Conforme novos livros forem adicionados, outros gêneros poderão aparecer no catálogo.
 
-## Identidade visual
+---
 
-A Luna's Library utiliza uma identidade visual delicada, feminina, elegante e literária.
+## 🎨 Identidade Visual
 
-### Paleta principal
+A Luna's Library possui uma identidade **feminina, delicada, elegante e literária**, combinando tons suaves com detalhes marcantes.
 
-- Tickle Me Pink — `#F283AF`
-- Champagne — `#FBF4EB`
-- Blush — `#FBD9E5`
-- Raspberry Rose — `#C43670`
-- Sunset — `#F3CC97`
+### Paleta
 
-A interface também utiliza tons neutros derivados para garantir legibilidade e adaptar a experiência aos temas claro, escuro e sépia.
+| Cor | Código |
+|---|---|
+| 🌷 Tickle Me Pink | `#F283AF` |
+| 🕊️ Champagne | `#FBF4EB` |
+| 🌸 Blush / Cherry Blossom | `#FBD9E5` |
+| 🌹 Raspberry Rose | `#C43670` |
+| ☀️ Sunset | `#F3CC97` |
 
-## Tecnologias
+A interface também utiliza tons neutros derivados para manter a harmonia visual e adaptar a experiência aos temas **claro, escuro e sépia**.
+
+---
+
+## ✧ Experiência de leitura
+
+A plataforma foi pensada para que cada leitor possa:
+
+**Descobrir → Escolher → Comprar → Ler → Continuar**
+
+O leitor pode acompanhar seu progresso e acessar os livros disponíveis em sua própria estante.
+
+---
+
+## 💌 Pagamentos
+
+O sistema utiliza **Pix com confirmação manual**.
+
+Após realizar o pagamento, o pedido é analisado pela administração. O acesso ao livro somente é liberado após a confirmação do pagamento.
+
+---
+
+## 🛠️ Tecnologias
 
 - HTML
 - CSS
@@ -71,21 +93,73 @@ A interface também utiliza tons neutros derivados para garantir legibilidade e 
 - Supabase
 - GitHub Pages
 
-## Banco de dados
+---
 
-O projeto utiliza **Supabase** para autenticação, banco de dados, controle de acesso e armazenamento das informações da plataforma.
-
-O acesso aos recursos administrativos é controlado por funções de usuário e políticas de segurança do banco de dados.
-
-## Pagamentos
-
-O fluxo atual utiliza **Pix com confirmação manual**.
-
-O pedido não libera automaticamente o livro. O acesso é concedido somente após a confirmação do pagamento pela administração.
-
-## Estrutura do projeto
+## 🗂️ Estrutura
 
 ```text
 lunas-library/
+│
 ├── index.html
 └── README.md
+
+A estrutura poderá crescer conforme novas funcionalidades forem adicionadas.
+
+
+---
+
+🔐 Banco de dados
+
+A Luna's Library utiliza Supabase para:
+
+autenticação;
+
+perfis de usuários;
+
+livros e capítulos;
+
+pedidos e pagamentos;
+
+biblioteca do leitor;
+
+progresso de leitura;
+
+comunidade;
+
+universos;
+
+quizzes;
+
+controle de acesso.
+
+
+O acesso administrativo é protegido por funções de usuário e políticas de segurança (RLS).
+
+
+---
+
+🌎 Idiomas
+
+A plataforma foi planejada para possibilitar a leitura das obras em diferentes idiomas.
+
+O conteúdo original permanece em português, enquanto traduções poderão ser disponibilizadas quando existirem versões reais das obras.
+
+
+---
+
+🚧 Status
+
+Em desenvolvimento.
+
+A Luna's Library está sendo construída aos poucos, recebendo novos livros, recursos e melhorias de experiência.
+
+♡ Uma biblioteca feita de histórias, universos e pequenos detalhes.
+
+
+---
+
+🌷 Luna's Library
+
+Livros & Universos
+
+© Luna's Library
