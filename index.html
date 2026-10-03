@@ -336,7 +336,7 @@ async function livro(slug){
   const {data:b,error}=await sb.from('book_catalog').select('*').eq('slug',slug).maybeSingle();
   if(error)throw error;
   if(!b){app.innerHTML=state('Livro não encontrado.');return}
-  const {data:ch,error:e2}=await sb.from('chapters').select('id,position,title').eq('book_id',b.id).order('position');if(e2)throw e2;
+  const {data:ch,error:e2}=await sb.from('chapters').select('id,position,title,is_free_preview').eq('book_id',b.id).order('position');if(e2)throw e2;
   await roleP;
   let owned=false,order=null,pay=null,pix=null,qr=null,prog=null,last=null;
   if(user){
@@ -361,7 +361,7 @@ async function livro(slug){
   else if(b.is_purchasable)action=user?`${topPay(last?.payments)==='rejected'?`<p class="state bad">${PS.rejected}: seu último pagamento não foi aceito. O livro continua bloqueado. Você pode fazer um novo pedido.</p>`:''}<button class="big" data-a="buy" data-id="${b.id}">Comprar por ${brl(b.effective_price_cents)}</button>`:'<a class="btn big" href="#/login">Entre para comprar</a>';
   else action='<button class="big" disabled>Compra ainda não disponível</button>';
   app.innerHTML=`<div class="bookhead"><div class="cover">${coverHtml(b)}</div><div><h1>${esc(b.title)}</h1>${by(b)}<div>${gtag(b)}${badges(b)}</div>${b.description?`<p class="eyebrow" style="margin-top:1.4rem">Sinopse</p><p class="desc">${esc(b.description)}</p>`:''}<p class="price big">${priceHtml(b)}</p><div class="act">${action}</div></div></div>
-  <h2 style="margin-top:2.4rem">Sumário</h2>${ch.length?`<div class="chaps">${ch.map(x=>x.position===1||canRead?`<a class="chap" href="#/ler/${esc(b.slug)}/${x.position}"><b>${x.position}</b><span>${esc(x.title)}</span>${!canRead?'<em class="st free">Prévia gratuita</em>':''}</a>`:`<div class="chap locked" aria-disabled="true"><b>${x.position}</b><span>${esc(x.title)}</span><em class="st">${LOCK}Bloqueado</em></div>`).join('')}</div>${!canRead&&ch.length>1?'<p class="mute">O capítulo 1 é a prévia gratuita. Os demais ficam bloqueados até a confirmação do pagamento.</p>':''}`:state('A leitura deste livro ainda não está disponível.')}`;
+  <h2 style="margin-top:2.4rem">Sumário</h2>${ch.length?`<div class="chaps">${ch.map(x=>x.is_free_preview||canRead?`<a class="chap" href="#/ler/${esc(b.slug)}/${x.position}"><b>${x.position}</b><span>${esc(x.title)}</span>${!canRead?'<em class="st free">Prévia gratuita</em>':''}</a>`:`<div class="chap locked" aria-disabled="true"><b>${x.position}</b><span>${esc(x.title)}</span><em class="st">${LOCK}Bloqueado</em></div>`).join('')}</div>${!canRead&&ch.some(x=>!x.is_free_preview)?'<p class="mute">A prévia gratuita está liberada. Os demais capítulos ficam bloqueados até a confirmação do pagamento.</p>':''}`:state('A leitura deste livro ainda não está disponível.')}`;
 }
 
 const LOCK='<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>';
@@ -374,22 +374,22 @@ async function ler(slug,pos){
   pos=+pos;const lang=new URLSearchParams(location.hash.split('?')[1]||'').get('l')||'pt-BR';
   const {data:b}=await sb.from('books').select('id,slug,title').eq('slug',slug).maybeSingle();
   if(!b){app.innerHTML=state('Livro não encontrado.');return}
-  const {data:ch}=await sb.from('chapters').select('id,position,title').eq('book_id',b.id).order('position');
+  const {data:ch}=await sb.from('chapters').select('id,position,title,is_free_preview').eq('book_id',b.id).order('position');
   const c=(ch||[]).find(x=>x.position===pos);
   if(!c){app.innerHTML=state('Capítulo não disponível.')+`<p><a href="#/livro/${esc(slug)}">Voltar ao livro</a></p>`;return}
   await roleP;
   let owned=false;if(user&&!isAdmin)owned=!!(await sb.from('book_entitlements').select('id').eq('user_id',user.id).eq('book_id',b.id).eq('status','active').maybeSingle()).data;
   const full=owned||isAdmin;
-  if(pos!==1&&!full){app.innerHTML=`<div class="lockbox">${LOCK}<h1>Capítulo ${pos} bloqueado</h1><p class="mute">Somente o capítulo 1 é prévia gratuita. Os demais são liberados depois que o pagamento do livro for confirmado.</p><p class="row"><a class="btn" href="#/livro/${esc(slug)}">Ver o livro</a>${user?'':'<a class="btn alt" href="#/login">Entrar</a>'}</p></div>`;return}
+  if(!c.is_free_preview&&!full){app.innerHTML=`<div class="lockbox">${LOCK}<h1>Capítulo ${pos} bloqueado</h1><p class="mute">Este capítulo é liberado depois que o pagamento do livro for confirmado.</p><p class="row"><a class="btn" href="#/livro/${esc(slug)}">Ver o livro</a>${user?'':'<a class="btn alt" href="#/login">Entrar</a>'}</p></div>`;return}
   const [{data:orig},{data:tr}]=await Promise.all([sb.from('chapter_contents').select('body').eq('chapter_id',c.id).maybeSingle(),sb.from('chapter_translations').select('language,title,body').eq('chapter_id',c.id)]);
   if(!orig){app.innerHTML=state(user?'Você não tem acesso a este capítulo. O acesso é liberado após a confirmação do pagamento.':'Entre na sua conta para ler.')+`<p><a href="#/${user?'livro/'+esc(slug):'login'}">${user?'Ver livro':'Entrar'}</a></p>`;return}
   const t=(tr||[]).find(x=>x.language===lang);
   const show=t?{title:t.title,body:t.body,l:lang}:{title:c.title,body:orig.body,l:'pt-BR'};
   const langs=['pt-BR',...(tr||[]).map(x=>x.language)];
   const prev=ch.find(x=>x.position===pos-1),next=ch.find(x=>x.position===pos+1);
-  app.innerHTML=`<div class="rbar" id="rbar"></div><div class="rtools"><a href="#/livro/${esc(slug)}">${esc(b.title)}</a><details class="idx"><summary>Capítulo ${pos} de ${ch.length} ▾</summary><div class="idx-m">${ch.map(x=>x.position===1||full?`<a href="#/ler/${esc(slug)}/${x.position}?l=${show.l}"${x.position===pos?' class="on"':''}>${x.position}. ${esc(x.title)}</a>`:`<span class="lk" aria-disabled="true">${LOCK}${x.position}. ${esc(x.title)}</span>`).join('')}</div></details><span class="row">${langs.length>1?`<select id="lang" class="sm" aria-label="Idioma">${langs.map(l=>`<option ${l===show.l?'selected':''}>${l}</option>`).join('')}</select>`:''}<button class="alt sm" data-a="fs" data-d="-1" aria-label="Diminuir fonte">A−</button><button class="alt sm" data-a="fs" data-d="1" aria-label="Aumentar fonte">A+</button></span></div>
+  app.innerHTML=`<div class="rbar" id="rbar"></div><div class="rtools"><a href="#/livro/${esc(slug)}">${esc(b.title)}</a><details class="idx"><summary>Capítulo ${pos} de ${ch.length} ▾</summary><div class="idx-m">${ch.map(x=>x.is_free_preview||full?`<a href="#/ler/${esc(slug)}/${x.position}?l=${show.l}"${x.position===pos?' class="on"':''}>${x.position}. ${esc(x.title)}</a>`:`<span class="lk" aria-disabled="true">${LOCK}${x.position}. ${esc(x.title)}</span>`).join('')}</div></details><span class="row">${langs.length>1?`<select id="lang" class="sm" aria-label="Idioma">${langs.map(l=>`<option ${l===show.l?'selected':''}>${l}</option>`).join('')}</select>`:''}<button class="alt sm" data-a="fs" data-d="-1" aria-label="Diminuir fonte">A−</button><button class="alt sm" data-a="fs" data-d="1" aria-label="Aumentar fonte">A+</button></span></div>
   <article class="page"><h1>${esc(show.title)}</h1><div class="read">${renderBody(show.body)}</div></article>
-  <div class="rnav">${prev?`<a class="btn alt" href="#/ler/${esc(slug)}/${prev.position}?l=${show.l}">Capítulo anterior</a>`:'<span></span>'}${next?(full?`<a class="btn" href="#/ler/${esc(slug)}/${next.position}?l=${show.l}">Próximo capítulo</a>`:`<a class="btn" href="#/livro/${esc(slug)}">Desbloquear o livro</a>`):'<span></span>'}</div>${next&&!full?'<p class="mute" style="text-align:center">Fim da prévia gratuita. Os próximos capítulos são liberados depois da confirmação do pagamento.</p>':''}`;
+  <div class="rnav">${prev?`<a class="btn alt" href="#/ler/${esc(slug)}/${prev.position}?l=${show.l}">Capítulo anterior</a>`:'<span></span>'}${next?(full||next.is_free_preview?`<a class="btn" href="#/ler/${esc(slug)}/${next.position}?l=${show.l}">Próximo capítulo</a>`:`<a class="btn" href="#/livro/${esc(slug)}">Desbloquear o livro</a>`):'<span></span>'}</div>${next&&!full&&!next.is_free_preview?'<p class="mute" style="text-align:center">Fim da prévia gratuita. Os próximos capítulos são liberados depois da confirmação do pagamento.</p>':''}`;
   const s=document.getElementById('lang');if(s)s.onchange=()=>go(`/ler/${slug}/${pos}?l=${s.value}`);
   const bar=document.getElementById('rbar'),upd=()=>{const h=document.documentElement,f=h.scrollTop/Math.max(1,h.scrollHeight-h.clientHeight);bar.style.width=Math.min(100,((pos-1)+f)/ch.length*100)+'%'};onscroll=upd;upd();
   if(user&&full)sb.from('reading_progress').upsert({user_id:user.id,book_id:b.id,language:show.l,chapter_id:c.id,progress_percent:Math.round(pos/ch.length*100),last_read_at:new Date().toISOString()},{onConflict:'user_id,book_id,language'}).then(()=>{});
