@@ -286,6 +286,9 @@ button.danger{background:transparent;color:#b3261e;border-color:#b3261e}button.d
 .desc.syn{display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
 button.more{min-height:0;padding:.1rem 0;margin:.1rem 0 .8rem;background:none;border:0;color:var(--link);font:600 .9rem var(--ui)}
 button.more:hover{background:none;color:var(--linkH)}button.more[hidden]{display:none}
+/* ===== v7: aviso em barra de notificação (antes era uma bolinha) ===== */
+#toast{top:calc(env(safe-area-inset-top,0px) + 4.2rem);bottom:auto;left:50%;right:auto;width:max-content;max-width:min(92vw,520px);border-radius:12px;padding:.75rem 1.1rem;text-align:center;font:600 .92rem/1.4 var(--ui);overflow-wrap:anywhere;transform:translate(-50%,-160%);box-shadow:0 10px 28px -10px rgba(0,0,0,.4)}
+#toast.on{transform:translate(-50%,0);pointer-events:auto;cursor:pointer}
 </style>
 </head>
 <body>
@@ -324,7 +327,7 @@ const setTheme=t=>{document.documentElement.dataset.theme=t;localStorage.setItem
 const applyTheme=setTheme;applyTheme(localStorage.getItem('ll-theme')||'light');
 document.documentElement.style.setProperty('--fs',(localStorage.getItem('ll-fs')||1.3)+'rem');
 addEventListener('error',e=>toast('Erro: '+(e.message||'inesperado')));addEventListener('unhandledrejection',e=>toast('Erro: '+(e.reason?.message||e.reason||'inesperado')));
-const toast=m=>{const t=document.getElementById('toast');t.textContent=m;t.classList.add('on');clearTimeout(toast.t);toast.t=setTimeout(()=>t.classList.remove('on'),3500)};
+const toast=m=>{const t=document.getElementById('toast');t.textContent=m;t.classList.add('on');clearTimeout(toast.t);toast.t=setTimeout(()=>t.classList.remove('on'),Math.min(9000,Math.max(3500,String(m).length*70)));t.onclick=()=>{clearTimeout(toast.t);t.classList.remove('on')}};
 
 // ---- cabeçalho ----
 const nav=document.getElementById('nav'),menu=document.getElementById('menu');
@@ -711,10 +714,14 @@ const fail=e=>toast(ERR[e.message]||e.message);
 const ordN=n=>'#'+String(n||0).padStart(4,'0');
 const STAT={pending:'🟡 Aguardando pagamento',proof_submitted:'🟠 Pagamento em análise',confirmed:'🟢 Pagamento confirmado · Acesso liberado',paid:'🟢 Pagamento confirmado · Acesso liberado',rejected:'🔴 Pagamento recusado · livro continua bloqueado',cancelled:'⚪ Pedido cancelado',expired:'⚪ Pedido expirado'};
 async function mailOrder(id){
-  if(!id)return;const {error}=await sb.functions.invoke('send-order-email',{body:{order_id:id}});
-  if(!error)return toast('Enviamos as instruções de pagamento para o seu e-mail.');
-  let c='';try{c=(await error.context.json()).error}catch(e){}
-  toast(c==='email_not_configured'?'Pedido criado, mas o envio por e-mail ainda não está configurado. Fale com a administração.':c==='too_soon'?'O e-mail foi enviado há pouco. Confira sua caixa de entrada (e o spam).':'Pedido criado, mas não foi possível enviar o e-mail agora. Use "Reenviar instruções por e-mail" daqui a pouco.');
+  if(!id)return toast('Pedido criado, mas não consegui identificar o pedido para enviar o e-mail. Use "Reenviar instruções por e-mail".');
+  const {data,error}=await sb.functions.invoke('send-order-email',{body:{order_id:id}});
+  if(!error&&!(data&&data.error))return toast('Enviamos as instruções de pagamento para o seu e-mail.');
+  let c=data&&data.error||'',st=error&&error.context&&error.context.status;
+  if(error&&!c){try{c=(await error.context.json()).error}catch(e){}}
+  console.error('send-order-email falhou:',st,c,error||data);
+  const M={email_not_configured:'Pedido criado, mas o envio por e-mail ainda não está configurado. Fale com a administração.',too_soon:'O e-mail foi enviado há pouco. Confira sua caixa de entrada (e o spam).'};
+  toast(M[c]||(st===404&&!c?'Pedido criado, mas a função de e-mail não está publicada no servidor (erro 404).':'Pedido criado, mas o e-mail falhou'+(st||c?` (${[st,c].filter(Boolean).join(': ')})`:'')+'. Use "Reenviar instruções por e-mail".'));
 }
 const seg=a=>`<div class="seg"><a href="#/universos"${a==='u'?' class="on" aria-current="page"':''}>Universos</a><a href="#/quizzes"${a==='q'?' class="on" aria-current="page"':''}>Quizzes</a></div>`;
 async function quizzes(){
@@ -758,7 +765,7 @@ const actions={
     const t=prompt('Isto apaga sua conta de forma permanente e não pode ser desfeito.\n\nPara confirmar, digite EXCLUIR:');
     if(t===null)return;if(t.trim().toUpperCase()!=='EXCLUIR')return toast('Confirmação incorreta. Nada foi excluído.');
     const {error}=await sb.rpc('delete_my_account');
-    if(error)return toast(/function|schema cache/i.test(error.message)?'A exclusão de conta ainda não está habilitada no servidor.':error.message);
+    if(error)return toast(/function|schema cache/i.test(error.message)?'A exclusão de conta ainda não está habilitada no servidor.':/foreign key/i.test(error.message)?'Não foi possível excluir a conta agora: há dados vinculados a ela. Fale com a administração.':error.message);
     await actions.logout();toast('Sua conta foi excluída.')},
   logout:async()=>{
     try{await sb.auth.signOut({scope:'local'})}catch(e){}
@@ -767,7 +774,10 @@ const actions={
     document.querySelectorAll('details[open]').forEach(d=>d.removeAttribute('open'));
     header();go('/');route()},
   proof:async b=>{const w=window.open('','_blank');const {data,error}=await sb.storage.from('payment-proofs').createSignedUrl(b.dataset.p,600);if(error||!data){if(w)w.close();return toast('Não foi possível abrir o comprovante.')}if(w)w.location=data.signedUrl;else location.href=data.signedUrl},
-  buy:async b=>{const {data,error}=await sb.rpc('create_order',{p_book_id:b.dataset.id});if(error)return fail(error);await route();mailOrder(data?.order_id)},
+  buy:async b=>{const {data,error}=await sb.rpc('create_order',{p_book_id:b.dataset.id});if(error)return fail(error);
+    const r0=Array.isArray(data)?data[0]:data;let oid=typeof r0==='string'?r0:(r0&&(r0.order_id||r0.id));
+    if(!oid){const {data:o}=await sb.from('orders').select('id').eq('user_id',user.id).eq('book_id',b.dataset.id).eq('status','pending').order('created_at',{ascending:false}).limit(1).maybeSingle();oid=o&&o.id}
+    await route();mailOrder(oid)},
   resend:async b=>{await mailOrder(b.dataset.id)},
   like:async b=>{const q=b.dataset.on==='1'?sb.from('post_likes').delete().eq('post_id',b.dataset.id).eq('user_id',user.id):sb.from('post_likes').insert({post_id:b.dataset.id});
     if(!user)return go('/login');const {error}=await q;error?fail(error):route()},
