@@ -289,6 +289,37 @@ button.more:hover{background:none;color:var(--linkH)}button.more[hidden]{display
 /* ===== v7: aviso em barra de notificação (antes era uma bolinha) ===== */
 #toast{top:calc(env(safe-area-inset-top,0px) + 4.2rem);bottom:auto;left:50%;right:auto;width:max-content;max-width:min(92vw,520px);border-radius:12px;padding:.75rem 1.1rem;text-align:center;font:600 .92rem/1.4 var(--ui);overflow-wrap:anywhere;transform:translate(-50%,-160%);box-shadow:0 10px 28px -10px rgba(0,0,0,.4)}
 #toast.on{transform:translate(-50%,0);pointer-events:auto;cursor:pointer}
+
+/* ===== v8: checkout em etapas ===== */
+.ck{max-width:880px;margin:0 auto}
+.ckst{display:grid;grid-template-columns:repeat(4,1fr);gap:.4rem;margin:0 0 2rem;padding:0;list-style:none;counter-reset:s}
+.ckst li{display:flex;align-items:center;gap:.55rem;padding:.55rem .7rem;border-radius:99px;color:var(--mute);font:600 .76rem var(--ui);letter-spacing:.08em;text-transform:uppercase;min-width:0}
+.ckst li b{display:inline-grid;place-items:center;flex:none;width:1.7rem;height:1.7rem;border-radius:50%;border:1px solid var(--line);font-size:.78rem}
+.ckst li span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ckst li.on{background:var(--soft);color:var(--soft-ink)}.ckst li.on b{background:var(--acc);border-color:var(--acc);color:var(--onacc)}
+.ckst li.ok b{background:var(--soft);border-color:var(--soft);color:var(--soft-ink)}
+.ckbook{display:grid;grid-template-columns:150px 1fr;gap:1.6rem;align-items:start}
+.ckbook .cover{max-width:150px}
+.ckrows{border-top:1px solid var(--line);margin:1.4rem 0 0}
+.ckrows div{display:flex;justify-content:space-between;gap:1rem;padding:.7rem 0;border-bottom:1px solid var(--line)}
+.ckrows .tot{font:500 1.5rem var(--serif);border-bottom:0}
+.ckrow{display:flex;flex-wrap:wrap;gap:.7rem;margin-top:1.4rem}
+.ckpay{display:grid;grid-template-columns:minmax(0,230px) 1fr;gap:1.8rem;align-items:start}
+.ckqr{background:#fff;border-radius:12px;padding:10px;width:100%;max-width:230px;aspect-ratio:1;object-fit:contain;display:block}
+.ckval{font:500 2.2rem var(--serif);margin:.1rem 0 .6rem}
+.ckcode{display:block;word-break:break-all;font-size:.82rem;background:var(--soft);color:var(--soft-ink);padding:.7rem .8rem;border-radius:10px;margin:.4rem 0 .7rem;user-select:all}
+.cktl{list-style:none;margin:1rem 0;padding:0}
+.cktl li{display:flex;gap:.7rem;align-items:center;padding:.5rem 0;color:var(--mute)}
+.cktl li i{width:.8rem;height:.8rem;border-radius:50%;border:1px solid var(--line);flex:none}
+.cktl li.ok{color:var(--ink)}.cktl li.ok i{background:var(--soft);border-color:var(--soft-ink)}
+.cktl li.now{color:var(--ink);font-weight:600}.cktl li.now i{background:var(--acc);border-color:var(--acc)}
+.ckdone{text-align:center;padding:1.5rem 0}.ckdone h2{font-size:2rem;margin:.3rem 0}
+.ckno{border:1px solid var(--line);border-radius:12px;padding:1rem 1.2rem;margin:1rem 0}
+.pixwarn{background:var(--soft);color:var(--soft-ink);border-radius:12px;padding:.9rem 1.1rem;margin:0 0 1.4rem}
+.paidban{background:var(--soft);color:var(--soft-ink);border-radius:12px;padding:1.1rem 1.3rem;margin:0 0 1.6rem}.paidban h3{margin:.1rem 0 .3rem}
+a.chap.locked{cursor:pointer;background:none}a.chap.locked:hover{background:var(--soft)}
+a.chap.locked .st{color:var(--link)}
+@media(max-width:620px){.ckst li span{display:none}.ckst li.on span{display:inline}.ckst{grid-template-columns:repeat(4,auto);justify-content:space-between}.ckbook{grid-template-columns:96px 1fr;gap:1rem}.ckbook .cover{max-width:96px}.ckpay{grid-template-columns:1fr}.ckqr{margin:0 auto}}
 </style>
 </head>
 <body>
@@ -380,12 +411,13 @@ async function livro(slug){
   const cur=prog&&ch.find(x=>x.id===prog.chapter_id);let action;
   if(owned)action=ch.length?`<a class="btn big" href="#/ler/${esc(b.slug)}/${(cur||ch[0]).position}">${cur?'Continuar lendo':'Começar a ler'}</a>${prog?`<div class="pbar" role="progressbar" aria-label="Progresso de leitura" aria-valuenow="${prog.progress_percent}" aria-valuemin="0" aria-valuemax="100"><i style="width:${prog.progress_percent}%"></i></div>`:''}`:'<button class="big" disabled>Conteúdo ainda não disponível</button>';
   else if(order)action=pay?.status==='proof_submitted'
-    ?`<div class="box"><span class="tag">🟠 Pagamento em análise</span> <span class="mute">Pedido ${ordN(order.order_number)}</span><p><strong>Pagamento enviado.</strong> A administração vai conferir. O acesso aos capítulos pagos só é liberado depois dessa confirmação.</p><p class="mute">Valor: ${brl(order.amount_cents)}</p></div>`
-    :`<div class="box"><span class="tag">🟡 Aguardando pagamento</span> <span class="mute">Pedido ${ordN(order.order_number)}</span><p><strong>Pedido criado.</strong> Enviamos as instruções de pagamento para o seu e-mail. O livro continua bloqueado até a administração confirmar o pagamento.</p><p class="mute">Valor: ${brl(order.amount_cents)}</p><p><button class="alt sm" data-a="resend" data-id="${order.id}">Reenviar instruções por e-mail</button></p></div>`;
-  else if(b.is_purchasable)action=user?`${topPay(last?.payments)==='rejected'?`<p class="state bad">${PS.rejected}: seu último pagamento não foi aceito. O livro continua bloqueado. Você pode fazer um novo pedido.</p>`:''}<button class="big" data-a="buy" data-id="${b.id}">Comprar por ${brl(b.effective_price_cents)}</button>`:'<a class="btn big" href="#/login">Entre para comprar</a>';
+    ?`<div class="box"><span class="tag">🟠 Pagamento em análise</span> <span class="mute">Pedido ${ordN(order.order_number)}</span><p><strong>Pagamento enviado.</strong> A administração vai conferir. O acesso aos capítulos pagos só é liberado depois dessa confirmação.</p><p class="mute">Valor: ${brl(order.amount_cents)}</p><p><a class="btn alt sm" href="#/checkout/${esc(b.slug)}">Ver status do pedido</a></p></div>`
+    :`<div class="box"><span class="tag">🟡 Aguardando pagamento</span> <span class="mute">Pedido ${ordN(order.order_number)}</span><p><strong>Pedido criado.</strong> Enviamos as instruções de pagamento para o seu e-mail. O livro continua bloqueado até a administração confirmar o pagamento.</p><p class="mute">Valor: ${brl(order.amount_cents)}</p><p class="row"><a class="btn" href="#/checkout/${esc(b.slug)}">Ver pagamento e enviar comprovante</a><button class="alt sm" data-a="resend" data-id="${order.id}">Reenviar instruções por e-mail</button></p></div>`;
+  else if(b.is_purchasable)action=user?`${topPay(last?.payments)==='rejected'?`<p class="state bad">${PS.rejected}: seu último pagamento não foi aceito. O livro continua bloqueado. Você pode fazer um novo pedido.</p>`:''}<a class="btn big" href="#/checkout/${esc(b.slug)}">Comprar livro por ${brl(b.effective_price_cents)}</a>`:`<a class="btn big" href="#/checkout/${esc(b.slug)}">Comprar livro por ${brl(b.effective_price_cents)}</a>`;
   else action='<button class="big" disabled>Compra ainda não disponível</button>';
-  app.innerHTML=`<div class="bookhead"><div class="cover">${coverHtml(b)}</div><div><h1>${esc(b.title)}</h1>${by(b)}<div>${gtag(b)}${badges(b)}</div>${b.description?`<p class="eyebrow" style="margin-top:1.4rem">Sinopse</p><p class="desc syn" id="syn">${esc(b.description)}</p><button type="button" class="more" id="synb" hidden>Ler mais</button>`:''}<p class="price big">${priceHtml(b)}</p><div class="act">${action}</div></div></div>
-  <h2 style="margin-top:2.4rem">Sumário</h2>${ch.length?`<div class="chaps">${ch.map(x=>x.is_free_preview||canRead?`<a class="chap" href="#/ler/${esc(b.slug)}/${x.position}"><b>${x.position}</b><span>${esc(x.title)}</span>${!canRead?'<em class="st free">Prévia gratuita</em>':''}</a>`:`<div class="chap locked" aria-disabled="true"><b>${x.position}</b><span>${esc(x.title)}</span><em class="st">${LOCK}Bloqueado</em></div>`).join('')}</div>${isAdmin?'<p class="mute">Você está com a conta administradora, por isso todos os capítulos ficam liberados para você. Para ver o bloqueio, saia e entre com uma conta comum.</p>':''}${!canRead&&ch.some(x=>!x.is_free_preview)?'<p class="mute">A prévia gratuita está liberada. Os demais capítulos ficam bloqueados até a confirmação do pagamento.</p>':''}`:state('A leitura deste livro ainda não está disponível.')}`;
+  const pb=await paidBanner();
+  app.innerHTML=`${pb}<div class="bookhead"><div class="cover">${coverHtml(b)}</div><div><h1>${esc(b.title)}</h1>${by(b)}<div>${gtag(b)}${badges(b)}</div>${b.description?`<p class="eyebrow" style="margin-top:1.4rem">Sinopse</p><p class="desc syn" id="syn">${esc(b.description)}</p><button type="button" class="more" id="synb" hidden>Ler mais</button>`:''}<p class="price big">${priceHtml(b)}</p><div class="act">${action}</div></div></div>
+  <h2 style="margin-top:2.4rem">Sumário</h2>${ch.length?`<div class="chaps">${ch.map(x=>x.is_free_preview||canRead?`<a class="chap" href="#/ler/${esc(b.slug)}/${x.position}"><b>${x.position}</b><span>${esc(x.title)}</span>${!canRead?'<em class="st free">Prévia gratuita</em>':''}</a>`:`<a class="chap locked" href="#/checkout/${esc(b.slug)}"><b>${x.position}</b><span>${esc(x.title)}</span><em class="st">${LOCK}Disponível após a compra</em></a>`).join('')}</div>${isAdmin?'<p class="mute">Você está com a conta administradora, por isso todos os capítulos ficam liberados para você. Para ver o bloqueio, saia e entre com uma conta comum.</p>':''}${!canRead&&ch.some(x=>!x.is_free_preview)?'<p class="mute">A prévia gratuita está liberada. Os demais capítulos ficam bloqueados até a confirmação do pagamento.</p>':''}`:state('A leitura deste livro ainda não está disponível.')}`;
   const syn=document.getElementById('syn'),synb=document.getElementById('synb');
   if(syn&&synb){const chk=()=>{if(syn.classList.contains('syn'))synb.hidden=!(syn.scrollHeight>syn.clientHeight+2)};
     requestAnimationFrame(chk);if(document.fonts&&document.fonts.ready)document.fonts.ready.then(chk);
@@ -409,16 +441,16 @@ async function ler(slug,pos){
   await roleP;
   let owned=false;if(user&&!isAdmin)owned=!!(await sb.from('book_entitlements').select('id').eq('user_id',user.id).eq('book_id',b.id).eq('status','active').maybeSingle()).data;
   const full=owned||isAdmin;
-  if(!c.is_free_preview&&!full){app.innerHTML=`<div class="lockbox">${LOCK}<h1>Capítulo ${pos} bloqueado</h1><p class="mute">Este capítulo é liberado depois que o pagamento do livro for confirmado.</p><p class="row"><a class="btn" href="#/livro/${esc(slug)}">Ver o livro</a>${user?'':'<a class="btn alt" href="#/login">Entrar</a>'}</p></div>`;return}
+  if(!c.is_free_preview&&!full){app.innerHTML=`<div class="lockbox">${LOCK}<h1>Capítulo ${pos} bloqueado</h1><p class="mute">Este capítulo é liberado depois que o pagamento do livro for confirmado.</p><p class="row"><a class="btn" href="#/checkout/${esc(slug)}">Comprar o livro</a><a class="btn alt" href="#/livro/${esc(slug)}">Ver o livro</a></p></div>`;return}
   const [{data:orig},{data:tr}]=await Promise.all([sb.from('chapter_contents').select('body').eq('chapter_id',c.id).maybeSingle(),sb.from('chapter_translations').select('language,title,body').eq('chapter_id',c.id)]);
   if(!orig){app.innerHTML=state(user?'Você não tem acesso a este capítulo. O acesso é liberado após a confirmação do pagamento.':'Entre na sua conta para ler.')+`<p><a class="btn alt sm" href="#/${user?'livro/'+esc(slug):'login'}">${user?'Ver livro':'Entrar'}</a></p>`;return}
   const t=(tr||[]).find(x=>x.language===lang);
   const show=t?{title:t.title,body:t.body,l:lang}:{title:c.title,body:orig.body,l:'pt-BR'};
   const langs=['pt-BR',...(tr||[]).map(x=>x.language)];
   const prev=ch.find(x=>x.position===pos-1),next=ch.find(x=>x.position===pos+1);
-  app.innerHTML=`<div class="rbar" id="rbar"></div><div class="rtools"><a class="btn alt sm" href="#/livro/${esc(slug)}">${esc(b.title)}</a><details class="idx"><summary>Capítulo ${pos} de ${ch.length} ▾</summary><div class="idx-m">${ch.map(x=>x.is_free_preview||full?`<a href="#/ler/${esc(slug)}/${x.position}?l=${show.l}"${x.position===pos?' class="on"':''}>${x.position}. ${esc(x.title)}</a>`:`<span class="lk" aria-disabled="true">${LOCK}${x.position}. ${esc(x.title)}</span>`).join('')}</div></details><span class="row">${langs.length>1?`<select id="lang" class="sm" aria-label="Idioma">${langs.map(l=>`<option ${l===show.l?'selected':''}>${l}</option>`).join('')}</select>`:''}<button class="alt sm" data-a="fs" data-d="-1" aria-label="Diminuir fonte">A−</button><button class="alt sm" data-a="fs" data-d="1" aria-label="Aumentar fonte">A+</button></span></div>
+  app.innerHTML=`<div class="rbar" id="rbar"></div><div class="rtools"><a class="btn alt sm" href="#/livro/${esc(slug)}">${esc(b.title)}</a><details class="idx"><summary>Capítulo ${pos} de ${ch.length} ▾</summary><div class="idx-m">${ch.map(x=>x.is_free_preview||full?`<a href="#/ler/${esc(slug)}/${x.position}?l=${show.l}"${x.position===pos?' class="on"':''}>${x.position}. ${esc(x.title)}</a>`:`<a class="lk" href="#/checkout/${esc(slug)}">${LOCK}${x.position}. ${esc(x.title)}</a>`).join('')}</div></details><span class="row">${langs.length>1?`<select id="lang" class="sm" aria-label="Idioma">${langs.map(l=>`<option ${l===show.l?'selected':''}>${l}</option>`).join('')}</select>`:''}<button class="alt sm" data-a="fs" data-d="-1" aria-label="Diminuir fonte">A−</button><button class="alt sm" data-a="fs" data-d="1" aria-label="Aumentar fonte">A+</button></span></div>
   <article class="page"><h1>${esc(show.title)}</h1><div class="read">${renderBody(show.body)}</div></article>
-  <div class="rnav">${prev?`<a class="btn alt" href="#/ler/${esc(slug)}/${prev.position}?l=${show.l}">Capítulo anterior</a>`:'<span></span>'}${next?(full||next.is_free_preview?`<a class="btn" href="#/ler/${esc(slug)}/${next.position}?l=${show.l}">Próximo capítulo</a>`:`<a class="btn" href="#/livro/${esc(slug)}">Desbloquear o livro</a>`):'<span></span>'}</div>${next&&!full&&!next.is_free_preview?'<p class="mute" style="text-align:center">Fim da prévia gratuita. Os próximos capítulos são liberados depois da confirmação do pagamento.</p>':''}`;
+  <div class="rnav">${prev?`<a class="btn alt" href="#/ler/${esc(slug)}/${prev.position}?l=${show.l}">Capítulo anterior</a>`:'<span></span>'}${next?(full||next.is_free_preview?`<a class="btn" href="#/ler/${esc(slug)}/${next.position}?l=${show.l}">Próximo capítulo</a>`:`<a class="btn" href="#/checkout/${esc(slug)}">Desbloquear o livro</a>`):'<span></span>'}</div>${next&&!full&&!next.is_free_preview?'<p class="mute" style="text-align:center">Fim da prévia gratuita. Os próximos capítulos são liberados depois da confirmação do pagamento.</p>':''}`;
   const s=document.getElementById('lang');if(s)s.onchange=()=>go(`/ler/${slug}/${pos}?l=${s.value}`);
   const bar=document.getElementById('rbar'),upd=()=>{const h=document.documentElement,f=h.scrollTop/Math.max(1,h.scrollHeight-h.clientHeight);bar.style.width=Math.min(100,((pos-1)+f)/ch.length*100)+'%'};onscroll=upd;upd();
   if(user&&full)sb.from('reading_progress').upsert({user_id:user.id,book_id:b.id,language:show.l,chapter_id:c.id,progress_percent:Math.round(pos/ch.length*100),last_read_at:new Date().toISOString()},{onConflict:'user_id,book_id,language'}).then(()=>{});
@@ -454,7 +486,7 @@ async function bookExtras(b){
     sb.from('posts').select('id,author_id,body,is_spoiler,edited_at,created_at,profiles(display_name,avatar_path),post_likes(user_id),comments(id)').eq('book_id',b.id).order('created_at',{ascending:false}).limit(30)]);
   const U=(ub||[]).map(x=>x.universes).filter(Boolean),ids=new Set(U.map(u=>u.id)),Q=(qz||[]).filter(q=>q.book_id===b.id||ids.has(q.universe_id));
   app.insertAdjacentHTML('beforeend',`${U.length||Q.length?`<h2 style="margin-top:2.4rem">Explore mais</h2><div class="row">${U.map(u=>`<a class="btn alt big" href="#/universos/${esc(u.slug)}">Ver Universo: ${esc(u.name)}</a>`).join('')}${Q.map(q=>`<a class="btn alt big" href="#/quiz/${q.id}">Responder Quiz: ${esc(q.title)}</a>`).join('')}</div>`:''}
-  <h2 style="margin-top:2.4rem">Opiniões dos leitores</h2>${user?`<div class="box wide"><form data-f="post" data-book="${b.id}"><textarea name="b" rows="3" maxlength="10000" required placeholder="Deixe seu comentário ou feedback sobre este livro"></textarea><label class="chk"><input type="checkbox" name="s"> Contém spoiler</label><button>Publicar</button></form></div>`:'<p class="state">Entre para deixar sua opinião. <a class="btn alt sm" href="#/login">Entrar</a></p>'}${(ps||[]).length?ps.map(postCard).join(''):state('Ainda não há opiniões sobre este livro.')}`);
+  <h2 style="margin-top:2.4rem">Comentários dos leitores</h2>${user?`<div class="box wide"><form data-f="post" data-book="${b.id}"><textarea name="b" rows="3" maxlength="10000" required placeholder="Deixe seu comentário ou feedback sobre este livro"></textarea><label class="chk"><input type="checkbox" name="s"> Contém spoiler</label><button>Publicar</button></form></div>`:'<p class="state">Entre para deixar sua opinião. <a class="btn alt sm" href="#/login">Entrar</a></p>'}${(ps||[]).length?ps.map(postCard).join(''):state('Ainda não há opiniões sobre este livro.')}`);
 }
 async function loadComments(id){
   const box=document.getElementById('c-'+id);
@@ -498,7 +530,8 @@ async function count(t,f){let q=sb.from(t).select('id',{count:'exact',head:true}
 async function admin(){
   if(!await guard())return;
   const [pend,ord,bk,us]=await Promise.all([count('payments',q=>q.in('status',['pending','proof_submitted'])),count('orders'),count('books'),count('profiles')]);
-  app.innerHTML=`<h1>Painel administrativo</h1><div class="grid">${[['/admin/pedidos',pend,'Pagamentos a conferir'],['/admin/pedidos',ord,'Pedidos'],['/admin/livros',bk,'Livros'],['/admin/usuarios',us,'Usuários']].map(([h,n,t])=>`<a class="tile" href="#${h}"><h2>${n}</h2><span class="mute">${t}</span></a>`).join('')}</div><p class="row"><a class="btn alt sm" href="#/admin/avatares">Gerenciar avatares</a><a class="btn alt sm" href="#/admin/configuracoes">Dados de pagamento (enviados por e-mail)</a></p>`;
+  const PW=await pixWarn();
+  app.innerHTML=`${PW}<h1>Painel administrativo</h1><div class="grid">${[['/admin/pedidos',pend,'Pagamentos a conferir'],['/admin/pedidos',ord,'Pedidos'],['/admin/livros',bk,'Livros'],['/admin/usuarios',us,'Usuários']].map(([h,n,t])=>`<a class="tile" href="#${h}"><h2>${n}</h2><span class="mute">${t}</span></a>`).join('')}</div><p class="row"><a class="btn alt sm" href="#/admin/avatares">Gerenciar avatares</a><a class="btn alt sm" href="#/admin/configuracoes">Dados de pagamento (enviados por e-mail)</a></p>`;
 }
 async function adminLivros(){
   if(!await guard())return;
@@ -517,11 +550,14 @@ async function adminLivros(){
   <button>Salvar livro</button></form><p class="mute">Sem janela de lançamento completa (início e fim), vale o preço normal.</p></div>`).join('')||state('Nenhum livro.')}`;
 }
 const PAYL={pending:'Aguardando pagamento',proof_submitted:'Pagamento informado',confirmed:'Confirmado',rejected:'Recusado',cancelled:'Cancelado'};
+const pixWarn=async()=>{try{const {data}=await sb.from('pix_settings').select('pix_key,copy_paste_code,qr_code_path').maybeSingle();const ok=data&&(data.copy_paste_code||data.pix_key||data.qr_code_path);return ok?'':'<div class="pixwarn"><strong>O Pix ainda não está configurado.</strong> Configure os dados de pagamento antes de aceitar pedidos. <a class="btn alt sm" href="#/admin/configuracoes">Configurar Pix</a></div>'}catch(e){return ''}};
 async function adminPedidos(){
   if(!await guard())return;
   const {data,error}=await sb.from('payments').select('id,status,amount_cents,created_at,rejected_reason,orders(user_id,order_number,books(title),profiles(display_name))').order('created_at',{ascending:false}).limit(100);if(error)throw error;
   let PR={};try{const {data:pp,error:pe}=await sb.from('payments').select('id,proof_path').not('proof_path','is',null);if(!pe&&pp)PR=Object.fromEntries(pp.map(x=>[x.id,x.proof_path]))}catch(e){}
-  app.innerHTML=`<h1>Pedidos e pagamentos</h1><p class="mute">Confira o recebimento do Pix antes de confirmar. Confirmar libera o acesso ao livro.</p>${data.length?data.map(x=>{const o=x.orders||{};return `<div class="box"><strong>${esc(o.books?.title||'Livro')}</strong> ${brl(x.amount_cents)} <span class="mute">Pedido ${ordN(o.order_number)}</span><br><span class="mute">${esc(o.profiles?.display_name||String(o.user_id||'').slice(0,8))} · ${fmt(x.created_at)}</span><br><span class="tag">${PAYL[x.status]}</span> ${PR[x.id]?`<button class="alt sm" data-a="proof" data-p="${esc(PR[x.id])}">Ver comprovante</button>`:(x.status==='proof_submitted'?'<span class="mute">sem comprovante anexado</span>':'')}${x.rejected_reason?` <span class="mute">${esc(x.rejected_reason)}</span>`:''}
+  let BY={};try{const {data:bb,error:be}=await sb.rpc('admin_order_buyers');if(!be&&bb)BY=Object.fromEntries(bb.map(x=>[x.payment_id,x]))}catch(e){}
+  const PW=await pixWarn();
+  app.innerHTML=`${PW}<h1>Pedidos e pagamentos</h1><p class="mute">Confira o recebimento do Pix antes de confirmar. Confirmar libera o acesso ao livro.</p>${data.length?data.map(x=>{const o=x.orders||{};return `<div class="box"><strong>${esc(o.books?.title||'Livro')}</strong> ${brl(x.amount_cents)} <span class="mute">Pedido ${ordN(o.order_number)}</span><br><span class="mute">${esc(BY[x.id]?.buyer_name||o.profiles?.display_name||String(o.user_id||'').slice(0,8))}${BY[x.id]?.buyer_email?` · ${esc(BY[x.id].buyer_email)}`:''} · ${fmt(x.created_at)}</span><br><span class="tag">${PAYL[x.status]}</span> ${PR[x.id]?`<button class="alt sm" data-a="proof" data-p="${esc(PR[x.id])}">Ver comprovante</button>`:(x.status==='proof_submitted'?'<span class="mute">sem comprovante anexado</span>':'')}${x.rejected_reason?` <span class="mute">${esc(x.rejected_reason)}</span>`:''}
   <div class="row">${['pending','proof_submitted','rejected'].includes(x.status)?`<button data-a="confirm" data-id="${x.id}">Confirmar pagamento</button>`:''}${['pending','proof_submitted'].includes(x.status)?`<button class="alt" data-a="reject" data-id="${x.id}">Rejeitar</button>`:''}</div></div>`}).join(''):state('Nenhum pedido ainda.')}`;
 }
 async function adminUsuarios(){
@@ -666,7 +702,7 @@ async function catalogo(){
   const gs=genresOf(bk),FL=[['','Todos'],['lan','Lançamentos'],['dis','Disponíveis'],['brev','Em breve']];
   const norm=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
   const chip=(k,v,t)=>`<button class="chip" data-k="${k}" data-v="${esc(v)}" aria-pressed="false">${esc(t)}</button>`;
-  app.innerHTML=`<div class="sh"><h1>Catálogo</h1><span class="mute" id="cn"></span></div><div class="bar"><label class="sq"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><input id="cq" type="search" placeholder="Buscar por título, autora ou gênero" value="${esc(q)}" aria-label="Buscar"></label><select id="co" class="sm" aria-label="Ordenar"><option value="">Ordem padrão</option><option value="az">Título A–Z</option><option value="lo">Menor preço</option><option value="hi">Maior preço</option></select></div><div class="chips" style="margin-bottom:.6rem">${FL.map(([v,t])=>chip('f',v,t)).join('')}</div>${gs.length?`<div class="chips" style="margin-bottom:1.4rem">${chip('g','','Todos os gêneros')}${gs.map(x=>chip('g',x,x)).join('')}</div>`:''}<div id="cl"></div>`;
+  app.innerHTML=`${await paidBanner()}<div class="sh"><h1>Catálogo</h1><span class="mute" id="cn"></span></div><div class="bar"><label class="sq"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><input id="cq" type="search" placeholder="Buscar por título, autora ou gênero" value="${esc(q)}" aria-label="Buscar"></label><select id="co" class="sm" aria-label="Ordenar"><option value="">Ordem padrão</option><option value="az">Título A–Z</option><option value="lo">Menor preço</option><option value="hi">Maior preço</option></select></div><div class="chips" style="margin-bottom:.6rem">${FL.map(([v,t])=>chip('f',v,t)).join('')}</div>${gs.length?`<div class="chips" style="margin-bottom:1.4rem">${chip('g','','Todos os gêneros')}${gs.map(x=>chip('g',x,x)).join('')}</div>`:''}<div id="cl"></div>`;
   const draw=()=>{
     let L=bk.filter(b=>(!g||b.genre===g)&&(!f||(f==='lan'?b.is_launch_active:f==='dis'?b.is_purchasable:!b.published_chapter_count))&&(!q||norm([b.title,b.author,b.genre,b.description].join(' ')).includes(norm(q))));
     if(o==='az')L=[...L].sort((a,b)=>a.title.localeCompare(b.title,'pt-BR'));
@@ -683,7 +719,7 @@ async function estante(){
   const P=new Map();(pg||[]).forEach(x=>{if(!P.has(x.book_id))P.set(x.book_id,x.progress_percent)});
   const L=data.map(x=>x.books).filter(Boolean),cur=L.find(b=>P.has(b.id));
   const item=b=>`<a class="bk" href="#/livro/${esc(b.slug)}"><div class="cover">${coverHtml(b)}</div><div class="bk-i"><h3>${esc(b.title)}</h3>${by(b)}${P.has(b.id)?`<div class="pbar" role="progressbar" aria-valuenow="${P.get(b.id)}" aria-valuemin="0" aria-valuemax="100"><i style="width:${P.get(b.id)}%"></i></div><span class="mute">${P.get(b.id)}% lido</span>`:'<span class="mute">Ainda não iniciado</span>'}</div></a>`;
-  app.innerHTML=`<h1>Minha estante</h1>${cur?`<a class="cont" href="#/livro/${esc(cur.slug)}"><div class="cover">${coverHtml(cur)}</div><div><p class="eyebrow">Continue lendo</p><h3>${esc(cur.title)}</h3>${by(cur)}<div class="pbar"><i style="width:${P.get(cur.id)}%"></i></div></div></a>`:''}${L.length?`<div class="grid">${L.map(item).join('')}</div>`:state('Você ainda não possui livros com acesso liberado. Pedidos pendentes aparecem em Minha conta.')}`;
+  app.innerHTML=`${await paidBanner()}<h1>Minha estante</h1>${cur?`<a class="cont" href="#/livro/${esc(cur.slug)}"><div class="cover">${coverHtml(cur)}</div><div><p class="eyebrow">Continue lendo</p><h3>${esc(cur.title)}</h3>${by(cur)}<div class="pbar"><i style="width:${P.get(cur.id)}%"></i></div></div></a>`:''}${L.length?`<div class="grid">${L.map(item).join('')}</div>`:state('Você ainda não possui livros com acesso liberado. Pedidos pendentes aparecem em Minha conta.')}`;
 }
 async function universos(){
   const {data,error}=await sb.from('universes').select('slug,name,description').order('sort_order');if(error)throw error;
@@ -711,12 +747,85 @@ const novaSenha=()=>{app.innerHTML=authForm('Nova senha',passF,['Salvar senha','
 const msg=t=>{const m=document.getElementById('msg');if(m)m.textContent=t};
 const ERR={book_not_purchasable:'Este livro ainda não está disponível para compra.',already_owned:'Você já possui este livro.'};
 const fail=e=>toast(ERR[e.message]||e.message);
+
+// ======================= v8: checkout em etapas =======================
+const CK={slug:null,step:1,order:null,pix:undefined,qr:null,pr:null};
+const CKS=['Produto','Seus dados','Pagamento','Confirmação'];
+const ckStepper=n=>`<ol class="ckst" aria-label="Etapas da compra">${CKS.map((t,i)=>`<li class="${i+1===n?'on':i+1<n?'ok':''}"${i+1===n?' aria-current="step"':''}><b>${i+1<n?'✓':i+1}</b><span>${t}</span></li>`).join('')}</ol>`;
+async function ckPixFor(orderId){
+  // 1) função segura do servidor (opcional)  2) tabela, se o RLS permitir  3) nada: o aviso diz para usar o e-mail
+  let p=null;
+  try{const {data,error}=await sb.rpc('get_order_pix',{p_order_id:orderId});if(!error&&data)p=Array.isArray(data)?data[0]:data}catch(e){}
+  if(!p){try{const {data}=await sb.from('pix_settings').select('*').maybeSingle();if(data)p=data}catch(e){}}
+  let qr=null;if(p?.qr_code_path){try{qr=(await sb.storage.from('pix-assets').createSignedUrl(p.qr_code_path,3600)).data?.signedUrl||null}catch(e){}}
+  return {p,qr};
+}
+async function ckLoadOrder(b){
+  const {data:o}=await sb.from('orders').select('id,amount_cents,order_number,created_at').eq('user_id',user.id).eq('book_id',b.id).eq('status','pending').order('created_at',{ascending:false}).limit(1).maybeSingle();
+  if(!o)return null;
+  const {data:pay}=await sb.from('payments').select('id,status').eq('order_id',o.id).in('status',['pending','proof_submitted']).order('created_at',{ascending:false}).limit(1).maybeSingle();
+  return {...o,pay};
+}
+async function checkout(slug){
+  await roleP;
+  const {data:b,error}=await sb.from('book_catalog').select('*').eq('slug',slug).maybeSingle();if(error)throw error;
+  if(!b){app.innerHTML=state('Livro não encontrado.');return}
+  if(!user){sessionStorage.setItem('ll-next','/checkout/'+slug);
+    app.innerHTML=`<div class="ck">${ckStepper(1)}<h1>Comprar ${esc(b.title)}</h1><p class="state">Entre na sua conta ou crie uma para comprar este livro. É por ela que o acesso será liberado depois da confirmação do pagamento.</p><p class="row"><a class="btn" href="#/login">Entrar</a><a class="btn alt" href="#/cadastro">Criar conta</a></p></div>`;return}
+  if(CK.slug!==slug){CK.slug=slug;CK.step=1;CK.order=null;CK.pix=undefined;CK.qr=null}
+  const owned=!!(await sb.from('book_entitlements').select('id').eq('user_id',user.id).eq('book_id',b.id).eq('status','active').maybeSingle()).data;
+  if(owned){CK.step=4;CK.done=true}else CK.done=false;
+  if(!owned){CK.order=await ckLoadOrder(b);if(CK.order&&CK.step<3)CK.step=3;if(CK.order&&CK.step===3&&CK.pix===undefined)CK.pix=await ckPixFor(CK.order.id);
+    if(!CK.order){const {data:l}=await sb.from('orders').select('id,payments(status,rejected_reason)').eq('user_id',user.id).eq('book_id',b.id).neq('status','pending').order('created_at',{ascending:false}).limit(1).maybeSingle();CK.last=l;if(CK.step>=3)CK.step=1}}
+  CK.book=b;ckRender();
+}
+function ckRender(){
+  const b=CK.book,st=CK.step,price=brl(b.effective_price_cents);
+  const head=`<div class="ck">${ckStepper(st)}`;
+  if(st===1){
+    const rej=CK.last&&topPay(CK.last.payments)==='rejected';
+    app.innerHTML=`${head}<h1>Sua compra</h1>${rej?`<p class="state bad">Pagamento recusado. Verifique o pagamento e faça um novo pedido: você poderá enviar outro comprovante. O livro continua bloqueado.</p>`:''}<div class="ckbook"><div class="cover">${coverHtml(b)}</div><div><h2 style="margin:.1rem 0">${esc(b.title)}</h2>${by(b)}${b.description?`<p class="mute" style="display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">${esc(b.description)}</p>`:''}<p class="price">${priceHtml(b)}</p></div></div>
+    <div class="ckrows"><div><span>Quantidade</span><span>1 (livro digital)</span></div><div><span>Subtotal</span><span>${price}</span></div><div class="tot"><span>Total</span><span>${price}</span></div></div>
+    ${b.is_purchasable?`<div class="ckrow"><button data-a="ckgo" data-s="2">Continuar</button><a class="btn alt" href="#/livro/${esc(b.slug)}">Voltar ao livro</a></div>`:state('A compra deste livro ainda não está disponível.')}</div>`;return}
+  if(st===2){
+    const nm=myProf?.display_name||user.user_metadata?.display_name||'';
+    app.innerHTML=`${head}<h1>Seus dados</h1><p class="mute">Confira os dados do comprador. O pedido fica ligado a esta conta, e o acesso ao livro é liberado nela.</p>
+    <form data-f="ckdados" style="max-width:480px"><label>Nome<input name="n" maxlength="60" required value="${esc(nm)}" autocomplete="name"></label><label>E-mail<input name="e" type="email" value="${esc(user.email)}" readonly aria-describedby="ckem"></label><p class="mute" id="ckem">O e-mail é o da sua conta. Para trocá-lo, use Configurações.</p>
+    <div class="ckrow"><button>Continuar para o pagamento</button><button type="button" class="alt" data-a="ckgo" data-s="1">Voltar</button></div></form></div>`;return}
+  if(st===3){
+    const o=CK.order,pp=CK.pix?.p,qr=CK.pix?.qr,conf=!!(pp&&(pp.copy_paste_code||pp.pix_key||qr));
+    const proofDone=o?.pay?.status==='proof_submitted';
+    app.innerHTML=`${head}<h1>Pagamento via Pix</h1><p class="mute">Pedido ${ordN(o.order_number)} · ${esc(b.title)}</p>
+    ${conf?`<div class="ckpay"><div>${qr?`<img class="ckqr" src="${esc(qr)}" alt="QR Code Pix">`:'<p class="mute">QR Code não cadastrado.</p>'}</div><div><p class="ckval">Pague ${brl(o.amount_cents)} via Pix</p>${pp.copy_paste_code?`<p class="eyebrow">Pix Copia e Cola</p><code class="ckcode">${esc(pp.copy_paste_code)}</code><button type="button" class="alt sm" data-a="copy" data-c="${esc(pp.copy_paste_code)}">Copiar código</button>`:''}${pp.receiver_name?`<p>Recebedor: ${esc(pp.receiver_name)}</p>`:''}${pp.pix_key?`<p>Chave Pix: ${esc(pp.pix_key)}</p>`:''}<p class="mute">${pp.instructions?esc(pp.instructions):'Abra o app do seu banco, escolha pagar com Pix e use o QR Code ou o código. Confira o valor antes de confirmar.'}</p></div></div>`
+    :`<div class="ckno"><p class="ckval">Pague ${brl(o.amount_cents)} via Pix</p><p>Os dados do Pix deste pedido foram enviados para o seu e-mail (${esc(user.email)}). Se não encontrar, veja o spam ou peça o reenvio.</p><p><button class="alt sm" data-a="resend" data-id="${o.id}">Reenviar instruções por e-mail</button></p></div>`}
+    <div class="ckno"><h3 style="margin-top:0">Depois de pagar, envie o comprovante</h3>${proofDone?'<p>Comprovante já enviado. Você pode enviar outro arquivo, se precisar.</p>':''}<div><label>Comprovante (imagem ou PDF, até 5 MB)<input type="file" id="proof" accept="image/*,application/pdf"></label><div class="ckrow" style="margin-top:.8rem"><button type="button" data-a="paid" data-m="file">Enviar comprovante</button>${proofDone?'':'<button type="button" class="alt" data-a="paid" data-m="none">Já paguei, sem comprovante</button>'}</div></div></div>
+    <div class="ckrow"><button class="alt" data-a="ckgo" data-s="4">Ver status do pedido</button></div></div>`;return}
+  // etapa 4 — confirmação
+  if(CK.done){app.innerHTML=`${head}<div class="ckdone"><span class="tag">🟢 Pagamento confirmado · Acesso liberado</span><h2>Pagamento confirmado!</h2><p>Seu acesso a <strong>${esc(b.title)}</strong> foi liberado.</p><div class="ckrow" style="justify-content:center"><a class="btn big" href="#/minha-estante">Ir para minha estante</a><a class="btn alt big" href="#/livro/${esc(b.slug)}">Abrir o livro</a></div></div></div>`;return}
+  const o=CK.order,ps=o?.pay?.status;
+  if(!o){app.innerHTML=`${head}<h1>Status do pedido</h1>${state('Você não tem pedido em aberto para este livro.')}<div class="ckrow"><button data-a="ckgo" data-s="1">Comprar o livro</button></div></div>`;return}
+  const L=[['Pedido criado',1],['Aguardando pagamento',ps?1:0],['Comprovante enviado',ps==='proof_submitted'?1:0],['Aguardando confirmação',ps==='proof_submitted'?1:0],['Pagamento confirmado',0],['Acesso liberado',0]];
+  const now=L.findIndex(x=>!x[1]);const tl=L.map((x,i)=>`<li class="${x[1]?'ok':i===now?'now':''}"><i></i>${x[0]}</li>`).join('');
+  app.innerHTML=`${head}<h1>Status do pedido</h1><p class="mute">Pedido ${ordN(o.order_number)} · ${esc(b.title)} · ${brl(o.amount_cents)}</p><ul class="cktl">${tl}</ul>
+  <p>${ps==='proof_submitted'?'Recebemos o seu comprovante. A administração vai conferir o pagamento. O livro continua bloqueado até essa confirmação.':'O livro continua bloqueado até o pagamento ser confirmado pela administração.'}</p>
+  <div class="ckrow"><button data-a="ckrefresh">Atualizar status</button>${ps==='proof_submitted'?'':'<button class="alt" data-a="ckgo" data-s="3">Voltar ao pagamento</button>'}<a class="btn alt" href="#/livro/${esc(b.slug)}">Voltar ao livro</a></div></div>`;
+}
+const paidBanner=async()=>{
+  if(!user)return '';
+  try{const {data}=await sb.from('orders').select('id,books(title,slug)').eq('user_id',user.id).eq('status','paid').order('paid_at',{ascending:false}).limit(3);
+    const seen=JSON.parse(localStorage.getItem('ll-ack')||'[]');
+    const n=(data||[]).filter(o=>!seen.includes(o.id));
+    return n.map(o=>`<div class="paidban"><h3>Pagamento confirmado!</h3><p>Seu acesso a <strong>${esc(o.books?.title||'seu livro')}</strong> foi liberado.</p><p class="row"><a class="btn" href="#/minha-estante" data-ack="${o.id}">Ir para minha estante</a><button class="alt sm" data-a="ack" data-id="${o.id}">Dispensar</button></p></div>`).join('');
+  }catch(e){return ''}
+};
+
 const ordN=n=>'#'+String(n||0).padStart(4,'0');
 const STAT={pending:'🟡 Aguardando pagamento',proof_submitted:'🟠 Pagamento em análise',confirmed:'🟢 Pagamento confirmado · Acesso liberado',paid:'🟢 Pagamento confirmado · Acesso liberado',rejected:'🔴 Pagamento recusado · livro continua bloqueado',cancelled:'⚪ Pedido cancelado',expired:'⚪ Pedido expirado'};
-async function mailOrder(id){
-  if(!id)return toast('Pedido criado, mas não consegui identificar o pedido para enviar o e-mail. Use "Reenviar instruções por e-mail".');
+async function mailOrder(id,quiet){
+  if(!id)return quiet?0:toast('Pedido criado, mas não consegui identificar o pedido para enviar o e-mail. Use "Reenviar instruções por e-mail".');
   const {data,error}=await sb.functions.invoke('send-order-email',{body:{order_id:id}});
   if(!error&&!(data&&data.error))return toast('Enviamos as instruções de pagamento para o seu e-mail.');
+  if(quiet)return;
   let c=data&&data.error||'',st=error&&error.context&&error.context.status;
   if(error&&!c){try{c=(await error.context.json()).error}catch(e){}}
   console.error('send-order-email falhou:',st,c,error||data);
@@ -778,6 +887,21 @@ const actions={
     const r0=Array.isArray(data)?data[0]:data;let oid=typeof r0==='string'?r0:(r0&&(r0.order_id||r0.id));
     if(!oid){const {data:o}=await sb.from('orders').select('id').eq('user_id',user.id).eq('book_id',b.dataset.id).eq('status','pending').order('created_at',{ascending:false}).limit(1).maybeSingle();oid=o&&o.id}
     await route();mailOrder(oid)},
+  ckgo:async b=>{CK.step=+b.dataset.s;if(CK.step===3&&!CK.order)return toast('Crie o pedido primeiro.');if(CK.step===4)CK.order=await ckLoadOrder(CK.book);ckRender()},
+  ckrefresh:async()=>{await checkout(CK.slug);if(CK.done)return;toast('Status atualizado: ainda aguardando a confirmação.')},
+  ack:async b=>{const a=JSON.parse(localStorage.getItem('ll-ack')||'[]');a.push(b.dataset.id);localStorage.setItem('ll-ack',JSON.stringify(a));route()},
+  copy:async b=>{const t=b.dataset.c;try{await navigator.clipboard.writeText(t)}catch(e){const i=document.createElement('textarea');i.value=t;document.body.appendChild(i);i.select();try{document.execCommand('copy')}catch(_){}i.remove()}toast('Código Pix copiado.')},
+  paid:async b=>{const m=b.dataset.m||'file';let path=null;const pay=CK.order?.pay;if(!pay)return toast('Pedido não encontrado.');
+    if(m==='file'){const f=document.getElementById('proof')?.files?.[0];
+      if(!f)return toast('Escolha o arquivo do comprovante.');
+      if(f.size>5*1024*1024)return toast('O arquivo deve ter até 5 MB.');
+      if(!/^(image\/|application\/pdf)/.test(f.type))return toast('Envie uma imagem ou PDF.');
+      const ext=(f.name.split('.').pop()||'bin').toLowerCase().replace(/[^a-z0-9]/g,'').slice(0,5)||'bin';
+      path=`${user.id}/${pay.id}-${Date.now()}.${ext}`;b.disabled=true;
+      const {error:ue}=await sb.storage.from('payment-proofs').upload(path,f,{contentType:f.type,upsert:false});
+      if(ue){b.disabled=false;return toast(/bucket|not found/i.test(ue.message)?'O envio de comprovante não está disponível agora. Use "Já paguei, sem comprovante".':ue.message)}}
+    const {error}=await sb.rpc('submit_payment_proof',{p_payment_id:pay.id,p_proof_path:path});if(error)return fail(error);
+    CK.order=await ckLoadOrder(CK.book);CK.step=4;ckRender();toast(m==='file'?'Comprovante enviado. Aguardando confirmação.':'Pagamento informado. Envie o comprovante quando puder.')},
   resend:async b=>{await mailOrder(b.dataset.id)},
   like:async b=>{const q=b.dataset.on==='1'?sb.from('post_likes').delete().eq('post_id',b.dataset.id).eq('user_id',user.id):sb.from('post_likes').insert({post_id:b.dataset.id});
     if(!user)return go('/login');const {error}=await q;error?fail(error):route()},
@@ -809,7 +933,15 @@ const forms={
   pix:async f=>{const u={id:1,pix_key_type:f.kt.value||null,pix_key:f.k.value||null,receiver_name:f.rn.value||null,copy_paste_code:f.cc.value||null,instructions:f.ins.value||null,updated_by:user.id};
     const file=f.qr.files[0];if(file){const path=`qr-${Date.now()}`;const {error}=await sb.storage.from('pix-assets').upload(path,file,{contentType:file.type});if(error)return fail(error);u.qr_code_path=path}
     const {error}=await sb.from('pix_settings').upsert(u,{onConflict:'id'});if(error)return fail(error);toast('Pix salvo.');route()},
-  login:async f=>{const {error}=await sb.auth.signInWithPassword({email:f.e.value,password:f.p.value});error?msg(error.message):go('/')},
+  ckdados:async f=>{const n=f.n.value.trim();if(!n)return toast('Informe o nome.');
+    if(n!==(myProf?.display_name||'')){const {error}=await sb.from('profiles').update({display_name:n}).eq('id',user.id);if(error)return fail(error);await loadProf()}
+    let ready=null;try{const r=await sb.rpc('pix_ready');if(!r.error&&typeof r.data==='boolean')ready=r.data}catch(e){}
+    if(ready===false){CK.step=2;return toast('O pagamento por Pix ainda não está disponível. Tente novamente mais tarde.')}
+    const {data,error}=await sb.rpc('create_order',{p_book_id:CK.book.id});if(error)return fail(error);
+    CK.order=await ckLoadOrder(CK.book);if(!CK.order)return toast('Não foi possível abrir o pedido.');
+    const r0=Array.isArray(data)?data[0]:data;const oid=r0&&(r0.order_id||r0.id)||CK.order.id;
+    CK.pix=await ckPixFor(oid);CK.step=3;ckRender();mailOrder(oid,true)},
+  login:async f=>{const {error}=await sb.auth.signInWithPassword({email:f.e.value,password:f.p.value});if(error)return msg(error.message);const nx=sessionStorage.getItem('ll-next');sessionStorage.removeItem('ll-next');go(nx||'/')},
   signup:async f=>{const {data,error}=await sb.auth.signUp({email:f.e.value,password:f.p.value,options:{data:{display_name:f.n.value}}});
     if(error)return msg(error.message);data.session?go('/'):msg('Verifique seu e-mail para confirmar o cadastro.')},
   reset:async f=>{const {error}=await sb.auth.resetPasswordForEmail(f.e.value,{redirectTo:location.href.split('#')[0]});msg(error?error.message:'Se o e-mail existir, você receberá um link.')},
@@ -825,7 +957,7 @@ document.addEventListener('submit',async e=>{const f=e.target,h=forms[f.dataset.
 
 const LOADER='<div aria-busy="true" aria-label="Carregando"><div class="skel" style="width:45%;height:2.4rem;margin-bottom:1.2rem"></div><div class="grid">'+'<div class="skel" style="aspect-ratio:2/3;height:auto"></div>'.repeat(3)+'</div></div>';
 // ---- roteador (hash, funciona em hospedagem estática) ----
-const routes=[[/^\/$/,home],[/^\/catalogo$/,catalogo],[/^\/livro\/([^/]+)$/,livro],[/^\/login$/,login],[/^\/cadastro$/,cadastro],[/^\/recuperar$/,recuperar],[/^\/minha-conta$/,conta,1],[/^\/minha-estante$/,estante,1],[/^\/quiz\/([^/]+)$/,quiz],[/^\/universos$/,universos],[/^\/universos\/([^/]+)$/,universo],[/^\/quizzes$/,quizzes],[/^\/ler\/([^/]+)\/(\d+)$/,ler],[/^\/admin$/,admin,1],[/^\/admin\/livros$/,adminLivros,1],[/^\/admin\/pedidos$/,adminPedidos,1],[/^\/admin\/usuarios$/,adminUsuarios,1],[/^\/admin\/configuracoes$/,adminPix,1],[/^\/admin\/importar$/,adminImportar,1],[/^\/admin\/avatares$/,adminAvatares,1],[/^\/configuracoes$/,configuracoes],[/^\/configuracoes\/conta$/,editarConta,1]];
+const routes=[[/^\/$/,home],[/^\/catalogo$/,catalogo],[/^\/livro\/([^/]+)$/,livro],[/^\/login$/,login],[/^\/cadastro$/,cadastro],[/^\/recuperar$/,recuperar],[/^\/minha-conta$/,conta,1],[/^\/minha-estante$/,estante,1],[/^\/quiz\/([^/]+)$/,quiz],[/^\/universos$/,universos],[/^\/universos\/([^/]+)$/,universo],[/^\/quizzes$/,quizzes],[/^\/ler\/([^/]+)\/(\d+)$/,ler],[/^\/admin$/,admin,1],[/^\/admin\/livros$/,adminLivros,1],[/^\/admin\/pedidos$/,adminPedidos,1],[/^\/admin\/usuarios$/,adminUsuarios,1],[/^\/admin\/configuracoes$/,adminPix,1],[/^\/admin\/importar$/,adminImportar,1],[/^\/admin\/avatares$/,adminAvatares,1],[/^\/checkout\/([^/]+)$/,checkout],[/^\/configuracoes$/,configuracoes],[/^\/configuracoes\/conta$/,editarConta,1]];
 async function route(){
   header();onscroll=null;const path=(location.hash.slice(1)||'/').split('?')[0];
   const raw=location.hash.slice(1);
