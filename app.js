@@ -176,7 +176,7 @@ async function configuracoes(){
   <div class="box"><h3>Sair</h3><p class="mute">Encerra a sessão neste aparelho. Sua conta e seus livros continuam salvos.</p><p><button class="alt" data-a="logout">Sair da conta</button></p></div>
   <div class="box"><h3>Excluir conta</h3><p class="mute">Apaga sua conta de forma permanente. Essa ação não pode ser desfeita.</p><p><button class="danger" data-a="delacc">Excluir minha conta</button></p></div>`
   :'<div class="box"><h3>Conta</h3><p class="mute"><a class="btn alt sm" href="#/login">Entre</a> ou <a class="btn alt sm" href="#/cadastro">cadastre-se</a> para gerenciar sua conta.</p></div>';
-  app.innerHTML=`<h1>Configurações</h1><div class="box"><h3>Aparência</h3><p class="mute">${user?'Sua escolha fica salva na sua conta e vale em qualquer aparelho.':'Sua escolha fica salva neste navegador. Entre para salvá-la na sua conta.'}</p><div class="opts" role="group" aria-label="Tema">${T.map(([k,n,g])=>`<button class="opt" data-a="theme" data-t="${k}" aria-pressed="${k===cur}"><i style="background:${g}"></i>${n}</button>`).join('')}</div></div>${acc}`;
+  app.innerHTML=`<h1>Configurações</h1><div class="box"><h3>Aparência</h3><p class="mute">${user?'Sua escolha fica salva na sua conta e vale em qualquer aparelho.':'Sua escolha fica salva neste navegador. Entre para salvá-la na sua conta.'}</p><div class="opts" role="group" aria-label="Tema">${T.map(([k,n,g])=>`<button class="opt" data-a="theme" data-t="${k}" aria-pressed="${k===cur}"><i style="background:${g}"></i>${n}</button>`).join('')}</div></div>${acc}<div class="box"><h3>Informações legais</h3><p class="mute">Como seus dados são tratados, as regras de uso e como funciona a compra.</p><p class="row"><a class="btn alt" href="#/privacidade">Política de Privacidade</a><a class="btn alt" href="#/termos">Termos de Uso</a><a class="btn alt" href="#/compra">Compra e Cancelamento</a></p></div>`;
 }
 
 // ---- experiência administrativa (o servidor valida cada ação via RLS/RPC; isto só organiza a interface) ----
@@ -497,11 +497,33 @@ async function quizzes(){
   app.innerHTML=`${seg('q')}<h1>Quizzes</h1>${data.length?data.map(q=>`<div class="box"><h3>${esc(q.title)}</h3>${q.description?`<p>${esc(q.description)}</p>`:''}${q.books?.title||q.universes?.name?`<p class="mute">${esc(q.books?.title||q.universes?.name)}</p>`:''}<a class="btn" href="#/quiz/${q.id}">Responder quiz</a></div>`).join(''):state('Nenhum quiz cadastrado ainda.')}`;
 }
 async function quiz(id){
-  const {data:q,error}=await sb.from('quizzes').select('id,title,description').eq('id',id).maybeSingle();if(error)throw error;
-  if(!q){app.innerHTML=state('Quiz não encontrado.');return}
+  app.innerHTML=seg('q')+LOADER;
+  let {data:q,error}=await sb.from('quizzes').select('id,title,description,kind').eq('id',id).maybeSingle();
+  if(error)({data:q,error}=await sb.from('quizzes').select('id,title,description').eq('id',id).maybeSingle());
+  if(error)throw error;
+  if(!q){app.innerHTML=seg('q')+state('Quiz não encontrado.');return}
   const {data:qs,error:e2}=await sb.from('quiz_questions').select('id,position,prompt,quiz_options(id,position,label)').eq('quiz_id',id).order('position');if(e2)throw e2;
-  if(!qs.length){app.innerHTML=`${seg('q')}<h1>${esc(q.title)}</h1>`+state('Este quiz ainda não tem perguntas.');return}
-  app.innerHTML=`${seg('q')}<h1>${esc(q.title)}</h1>${q.description?`<p>${esc(q.description)}</p>`:''}${user?'':'<p class="state">Entre para responder e registrar sua pontuação.</p>'}<form data-f="quiz" data-id="${q.id}" style="max-width:none">${qs.map(x=>`<fieldset class="box"><legend><strong>${x.position}. ${esc(x.prompt)}</strong></legend>${[...x.quiz_options].sort((a,b)=>a.position-b.position).map(o=>`<label style="font-weight:400;display:flex;gap:.6rem;align-items:center"><input type="radio" name="q_${x.id}" value="${o.id}" style="width:auto;min-height:0"> ${esc(o.label)}</label>`).join('')}</fieldset>`).join('')}<button ${user?'':'disabled'}>Enviar respostas</button></form><div id="qres"></div>`;
+  const head=`${seg('q')}<h1>${esc(q.title)}</h1>`;
+  if(!qs.length){app.innerHTML=head+state('Este quiz ainda não tem perguntas.');return}
+  const N=qs.length,pers=q.kind==='personality';let i=0,A={};
+  const draw=()=>{
+    if(!user){app.innerHTML=`${head}${q.description?`<p>${esc(q.description)}</p>`:''}<div class="box"><p>Entre na sua conta para responder.</p><p class="row"><button id="qlogin">Entrar para responder</button></p></div>`;
+      document.getElementById('qlogin').onclick=()=>{sessionStorage.setItem('ll-next','/quiz/'+id);go('/login')};return}
+    const x=qs[i],sel=A[x.id];
+    app.innerHTML=`${head}<div class="qprog"><span>Pergunta ${i+1} de ${N}</span><div class="pbar" role="progressbar" aria-valuemin="1" aria-valuemax="${N}" aria-valuenow="${i+1}"><i style="width:${(i+1)/N*100}%"></i></div></div><div class="box qcard"><h2 class="qp">${esc(x.prompt)}</h2><div class="qopts" role="radiogroup" aria-label="Alternativas">${[...x.quiz_options].sort((a,b)=>a.position-b.position).map(o=>`<button type="button" class="qopt" role="radio" aria-checked="${o.id===sel}" data-o="${o.id}">${esc(o.label)}</button>`).join('')}</div><p class="row">${i?'<button type="button" class="alt" id="qprev">Voltar</button>':''}<button type="button" id="qnext"${sel?'':' disabled'}>${i===N-1?'Ver resultado':'Próxima'}</button></p><p class="mute" id="qerr" role="alert"></p></div>`;
+    const nx=document.getElementById('qnext');
+    app.querySelectorAll('.qopt').forEach(b=>b.onclick=()=>{A[x.id]=b.dataset.o;app.querySelectorAll('.qopt').forEach(c=>c.setAttribute('aria-checked',String(c===b)));nx.disabled=false});
+    if(i)document.getElementById('qprev').onclick=()=>{i--;draw()};
+    nx.onclick=async()=>{
+      if(!A[x.id])return;
+      if(i<N-1){i++;draw();window.scrollTo(0,0);return}
+      nx.disabled=true;nx.textContent='Calculando…';
+      const {data,error}=await sb.rpc(pers?'submit_personality_quiz':'submit_quiz_attempt',{p_quiz_id:id,p_answers:A});
+      if(error||!data){nx.disabled=false;nx.textContent='Ver resultado';document.getElementById('qerr').textContent='Não foi possível enviar suas respostas agora. Tente novamente.';return}
+      app.innerHTML=`${head}<div class="box qres"><p class="eyebrow">${pers?'Seu resultado':'Resultado'}</p>${pers?`<h2>Você é ${esc(data.name)}!</h2><p class="qdesc">${esc(data.description)}</p>`:`<h2>${data.score} de ${data.max_score}</h2><p class="qdesc">Você acertou ${data.score} de ${data.max_score} perguntas.</p>`}<p class="row"><button id="qredo">Refazer o quiz</button><a class="btn alt" href="#/quizzes">Ver outros quizzes</a></p></div>`;
+      document.getElementById('qredo').onclick=()=>{A={};i=0;draw();window.scrollTo(0,0)};window.scrollTo(0,0)};
+  };
+  draw();
 }
 const actions={
   chtext:async b=>{const box=document.getElementById('ct-'+b.dataset.id);if(box.innerHTML){box.innerHTML='';b.textContent='Ver texto aqui';return}const {data,error}=await sb.from('chapter_contents').select('body').eq('chapter_id',b.dataset.id).maybeSingle();if(error)return fail(error);box.innerHTML=data?`<p class="mute">${data.body.length.toLocaleString('pt-BR')} caracteres · ${data.body.split(/\n{2,}/).length} parágrafos</p><div class="read">${renderBody(data.body)}</div>`:state('Sem texto.');b.textContent='Ocultar texto'},
@@ -643,7 +665,7 @@ function legal(k){
 <h2>Liberação do livro</h2><p>O livro só é liberado depois que o pagamento é confirmado. Enquanto isso, os capítulos pagos continuam bloqueados e a prévia gratuita continua disponível.</p>
 <h2>Cancelamento e reembolso</h2><p>Solicitações de cancelamento ou reembolso devem ser feitas por contato em até 3 dias úteis a partir da compra, pelo e-mail ${mail}. Não há outras condições definidas além desta.</p>`]};
   const [t,h]=P[k];
-  app.innerHTML=`<article class="legal"><h1>${t}</h1><p class="upd">Última atualização: ${LEGAL_UPD}</p>${h}<nav class="lnav" aria-label="Páginas institucionais"><a href="#/privacidade">Privacidade</a><a href="#/termos">Termos de Uso</a><a href="#/compra">Compra e Cancelamento</a></nav></article>`;
+  app.innerHTML=`<article class="legal"><h1>${t}</h1><p class="upd">Última atualização: ${LEGAL_UPD}</p>${h}<p class="row lnav"><a class="btn alt sm" href="#/configuracoes">← Configurações</a><a class="btn alt sm" href="#/privacidade">Privacidade</a><a class="btn alt sm" href="#/termos">Termos de Uso</a><a class="btn alt sm" href="#/compra">Compra e Cancelamento</a></p></article>`;
 }
 async function adminLivroCaps(slug){
   if(!await guard())return;

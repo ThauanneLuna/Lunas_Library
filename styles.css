@@ -317,3 +317,13 @@ a.chap.locked .st{color:var(--link)}
 .legal{max-width:44rem;margin:0 auto}.legal h2{font-size:1.5rem;margin:2rem 0 .5rem}.legal p,.legal li{line-height:1.75}.legal ul{padding-left:1.2rem}
 .legal .upd{color:var(--mute);font-size:.9rem;margin-bottom:1.5rem}.legal .lnav{display:flex;gap:1.2rem;flex-wrap:wrap;margin-top:2.5rem;padding-top:1rem;border-top:1px solid var(--line)}
 .fl{display:flex;gap:1.2rem;justify-content:center;flex-wrap:wrap;margin-bottom:.6rem;font:600 .78rem var(--ui);letter-spacing:.1em;text-transform:uppercase}.fl a{text-decoration:none}
+
+/* quiz: uma pergunta por vez */
+.qprog{display:grid;gap:.4rem;margin:0 0 1rem;font:600 .85rem var(--ui);color:var(--mute)}
+.qcard{padding:clamp(1.1rem,4vw,2rem)}.qp{font-size:clamp(1.35rem,4.5vw,1.9rem);margin:0 0 1.2rem;line-height:1.2}
+.qopts{display:grid;gap:.6rem;margin-bottom:1.4rem}
+button.qopt{text-align:left;justify-content:flex-start;height:auto;min-height:52px;padding:.8rem 1rem;background:var(--panel);color:var(--ink);border:1.5px solid var(--line);border-radius:14px;font-weight:500;line-height:1.4;white-space:normal}
+button.qopt:hover{border-color:var(--pink);background:var(--soft)}
+button.qopt[aria-checked=true]{border-color:var(--acc);background:var(--soft);color:var(--soft-ink);box-shadow:inset 0 0 0 1px var(--acc);font-weight:600}
+.qres{text-align:center;padding:clamp(1.5rem,6vw,3rem)}.qres h2{font-size:clamp(2rem,7vw,3.2rem);color:var(--link);margin:.2em 0}
+.qdesc{font:500 1.25rem/1.6 var(--serif);max-width:34rem;margin:1rem auto 1.6rem}.qres .row{justify-content:center}
