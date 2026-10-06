@@ -1,6 +1,6 @@
 // Somente chave PÚBLICA (publishable). Nunca coloque service_role aqui.
 const SB_URL='https://eulrdtkuxafhrygsbyuh.supabase.co', SB_KEY='sb_publishable_Vp3ulHnGeIPXfcT2P5y71A_olQSr9wp';
-const sb=supabase.createClient(SB_URL,SB_KEY);
+const sb=supabase.createClient(SB_URL,SB_KEY,{auth:{lock:async(n,t,fn)=>await fn()}});
 const app=document.getElementById('app');
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const brl=c=>(c/100).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
@@ -400,7 +400,7 @@ const emailF='<label>E-mail<input name="e" type="email" required autocomplete="e
 const passF='<label>Senha<input name="p" type="password" minlength="6" required autocomplete="current-password"></label>';
 const googleBtn='<button type="button" class="alt google-btn" data-a="google"><svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.8 32.7 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.1 8 3l5.7-5.7C34.6 6.1 29.6 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.7-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.6 16 19 13 24 13c3.1 0 5.8 1.1 8 3l5.7-5.7C34.6 6.1 29.6 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.5 26.7 36 24 36c-5.2 0-9.7-3.3-11.3-7.9l-6.5 5C9.6 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.3 4.2-4.1 5.6l6.2 5.2C40.9 36 44 30.5 44 24c0-1.3-.1-2.7-.4-3.5z"/></svg><span>Continuar com Google</span></button><div class="or"><span>ou</span></div>';
 const login=async()=>{app.innerHTML=authForm('Entrar',googleBtn+emailF+passF,['Entrar','login'])+'<p><a class="btn alt sm" href="#/cadastro">Criar conta</a> · <a class="btn alt sm" href="#/recuperar">Esqueci a senha</a></p>'};
-const cadastro=async()=>{app.innerHTML=authForm('Criar conta',googleBtn+'<label>Nome de exibição<input name="n" maxlength="60"></label>'+emailF+passF,['Cadastrar','signup'])+'<p><a class="btn alt sm" href="#/login">Já tenho conta</a></p>'};
+const cadastro=async()=>{app.innerHTML=authForm('Criar conta',googleBtn+'<label>Nome de exibição<input name="n" maxlength="60"></label>'+emailF+passF,['Cadastrar','signup'])+'<p class="mute">Ao criar sua conta, você concorda com os <a href="#/termos">Termos de Uso</a> e a <a href="#/privacidade">Política de Privacidade</a>.</p><p><a class="btn alt sm" href="#/login">Já tenho conta</a></p>'};
 const recuperar=async()=>{app.innerHTML=authForm('Redefinir senha',emailF,['Enviar link','reset'])};
 const novaSenha=()=>{app.innerHTML=authForm('Nova senha',passF,['Salvar senha','newpass'])};
 
@@ -746,3 +746,4 @@ async function route(){
 addEventListener('hashchange',route);
 sb.auth.onAuthStateChange((ev,s)=>{const id=s?.user?.id;if(ev==='PASSWORD_RECOVERY'){user=s.user;header();return novaSenha()}
   if(ev==='INITIAL_SESSION'||id!==user?.id){user=s?.user||null;isAdmin=false;const uid=user?.id;roleP=uid?sb.from('user_roles').select('role').eq('user_id',uid).eq('role','admin').maybeSingle().then(({data})=>{if(user?.id===uid){isAdmin=!!data;header()}},()=>{}):Promise.resolve();loadProf();const th=user?.user_metadata?.theme;if(['light','dark','sepia'].includes(th))applyTheme(th);route()}});
+setTimeout(()=>{if(!app.innerHTML.trim())route()},3000);
