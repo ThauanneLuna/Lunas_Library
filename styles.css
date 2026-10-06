@@ -178,6 +178,8 @@ h1{font-weight:500}
 .auth aside .moon{position:absolute;right:-10%;top:-10%;width:260px;fill:color-mix(in srgb,var(--pink) 28%,transparent);z-index:-1}
 .auth aside h2{font-size:2.2rem;color:var(--link);margin:0 0 .3em}.auth aside p{margin:0;font:italic 500 1.2rem var(--serif);color:var(--mute)}
 .auth-f{padding:clamp(1.5rem,5vw,3rem)}.auth-f h1{font-size:2.2rem}.auth-f form{max-width:none}.auth+p{text-align:center}
+.google-btn{width:100%;gap:.6rem;background:var(--page);color:var(--ink);border:1px solid var(--line)}.google-btn:hover{background:var(--panel2)}
+.or{display:flex;align-items:center;gap:.8rem;margin:1rem 0;color:var(--mute);font:600 .8rem var(--ui)}.or::before,.or::after{content:'';flex:1;height:1px;background:var(--line)}
 footer{font:italic 500 1.1rem var(--serif);padding:2rem 1rem}.fl a{font:600 .72rem var(--ui);letter-spacing:.14em;text-transform:uppercase;text-decoration:none}
 
 /* ===== v4: editorial, cores lisas, sem sublinhado ===== */

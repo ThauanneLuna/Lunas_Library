@@ -89,6 +89,7 @@ function renderBody(b){let dc=true;return b.split(/\n{2,}/).map(p=>{
   if(p.startsWith('@pov '))return `<div class="pov">ponto de vista — ${esc(p.slice(5))}</div>`;
   if(p.startsWith('> '))return `<p class="rupt">${inlineMD(p.slice(2))}</p>`;
   const c=dc&&!p.startsWith('—')?' class="dc"':'';dc=false;return `<p${c}>${inlineMD(p)}</p>`}).join('')}
+const LANGS=[['pt-BR','Português (Original)'],['en','English'],['es','Español']];
 async function ler(slug,pos){
   pos=+pos;const lang=new URLSearchParams(location.hash.split('?')[1]||'').get('l')||'pt-BR';
   const {data:b}=await sb.from('books').select('id,slug,title').eq('slug',slug).maybeSingle();
@@ -104,14 +105,15 @@ async function ler(slug,pos){
   if(!orig){app.innerHTML=state(user?'Você não tem acesso a este capítulo. O acesso é liberado após a confirmação do pagamento.':'Entre na sua conta para ler.')+`<p><a class="btn alt sm" href="#/${user?'livro/'+esc(slug):'login'}">${user?'Ver livro':'Entrar'}</a></p>`;return}
   const t=(tr||[]).find(x=>x.language===lang);
   const show=t?{title:t.title,body:t.body,l:lang}:{title:c.title,body:orig.body,l:'pt-BR'};
-  const langs=['pt-BR',...(tr||[]).map(x=>x.language)];
+  const have=new Set(['pt-BR',...(tr||[]).map(x=>x.language)]);
+  const langSel=`<select id="lang" class="sm" aria-label="Idioma">${LANGS.map(([code,label])=>`<option value="${esc(code)}"${code===show.l?' selected':''}${have.has(code)?'':' disabled'}>${esc(label)}${have.has(code)?'':' — indisponível'}</option>`).join('')}</select>`;
   const prev=ch.find(x=>x.position===pos-1),next=ch.find(x=>x.position===pos+1);
-  app.innerHTML=`<div class="rbar" id="rbar"></div><div class="rtools"><a class="btn alt sm" href="#/livro/${esc(slug)}">${esc(b.title)}</a><details class="idx"><summary>Capítulo ${pos} de ${ch.length} ▾</summary><div class="idx-m">${ch.map(x=>x.is_free_preview||full?`<a href="#/ler/${esc(slug)}/${x.position}?l=${show.l}"${x.position===pos?' class="on"':''}>${x.position}. ${esc(x.title)}</a>`:`<a class="lk" href="#/checkout/${esc(slug)}">${LOCK}${x.position}. ${esc(x.title)}</a>`).join('')}</div></details><span class="row">${langs.length>1?`<select id="lang" class="sm" aria-label="Idioma">${langs.map(l=>`<option ${l===show.l?'selected':''}>${l}</option>`).join('')}</select>`:''}<button class="alt sm" data-a="fs" data-d="-1" aria-label="Diminuir fonte">A−</button><button class="alt sm" data-a="fs" data-d="1" aria-label="Aumentar fonte">A+</button></span></div>
+  app.innerHTML=`<div class="rbar" id="rbar"></div><div class="rtools"><a class="btn alt sm" href="#/livro/${esc(slug)}">${esc(b.title)}</a><details class="idx"><summary>Capítulo ${pos} de ${ch.length} ▾</summary><div class="idx-m">${ch.map(x=>x.is_free_preview||full?`<a href="#/ler/${esc(slug)}/${x.position}?l=${show.l}"${x.position===pos?' class="on"':''}>${x.position}. ${esc(x.title)}</a>`:`<a class="lk" href="#/checkout/${esc(slug)}">${LOCK}${x.position}. ${esc(x.title)}</a>`).join('')}</div></details><span class="row">${langSel}<button class="alt sm" data-a="fs" data-d="-1" aria-label="Diminuir fonte">A−</button><button class="alt sm" data-a="fs" data-d="1" aria-label="Aumentar fonte">A+</button></span></div>
   <article class="page"><h1>${esc(show.title)}</h1><div class="read">${renderBody(show.body)}</div></article>
   <div class="rnav">${prev?`<a class="btn alt" href="#/ler/${esc(slug)}/${prev.position}?l=${show.l}">Capítulo anterior</a>`:'<span></span>'}${next?(full||next.is_free_preview?`<a class="btn" href="#/ler/${esc(slug)}/${next.position}?l=${show.l}">Próximo capítulo</a>`:`<a class="btn" href="#/checkout/${esc(slug)}">Desbloquear o livro</a>`):'<span></span>'}</div>${next&&!full&&!next.is_free_preview?'<p class="mute" style="text-align:center">Fim da prévia gratuita. Os próximos capítulos são liberados depois da confirmação do pagamento.</p>':''}`;
   const s=document.getElementById('lang');if(s)s.onchange=()=>go(`/ler/${slug}/${pos}?l=${s.value}`);
   const bar=document.getElementById('rbar'),upd=()=>{const h=document.documentElement,f=h.scrollTop/Math.max(1,h.scrollHeight-h.clientHeight);bar.style.width=Math.min(100,((pos-1)+f)/ch.length*100)+'%'};onscroll=upd;upd();
-  if(user&&full)sb.from('reading_progress').upsert({user_id:user.id,book_id:b.id,language:show.l,chapter_id:c.id,progress_percent:Math.round(pos/ch.length*100),last_read_at:new Date().toISOString()},{onConflict:'user_id,book_id,language'}).then(()=>{});
+  if(user&&full)sb.from('reading_progress').upsert({user_id:user.id,book_id:b.id,language:show.l,chapter_id:c.id,progress_percent:Math.round(pos/ch.length*100),last_read_at:new Date().toISOString()},{onConflict:'user_id,book_id'}).then(()=>{});
 }
 
 async function estante(){
@@ -335,7 +337,7 @@ function header(){
   const cur=(location.hash.slice(1)||'/').split('?')[0],adm=cur.startsWith('/admin');
   const on=p=>(p==='/universos'&&/^\/quiz/.test(cur))||((p==='/'||adm)?cur===p:(cur===p||cur.startsWith(p+'/')));
   const pubL=[['/','Início'],['/catalogo','Catálogo'],['/universos','Universos e Quizzes']];
-  const admL=[['/admin','Painel'],['/admin/livros','Livros'],['/admin/pedidos','Pedidos'],['/admin/usuarios','Usuários'],['/admin/importar','Importar'],['/admin/avatares','Avatares'],['/admin/configuracoes','Pagamento'],['/','Voltar ao site']];
+  const admL=[['/admin','Painel'],['/admin/livros','Livros'],['/admin/pedidos','Pedidos'],['/admin/usuarios','Usuários'],['/admin/importar','Importar'],['/admin/traducoes','Traduções'],['/admin/avatares','Avatares'],['/admin/configuracoes','Pagamento'],['/','Voltar ao site']];
   const nm=user?(user.user_metadata?.display_name||user.email):'';
   const a=user?`<details class="acct"><summary aria-label="Minha conta">${avHtml(myProf?.avatar_path,myProf?.display_name||nm)}</summary><div class="acct-m"><a href="#/minha-estante">Minha estante</a><a href="#/minha-conta">Minha conta</a>${isAdmin?'<a href="#/admin">Administração</a>':''}<button class="alt sm" data-a="logout">Sair</button></div></details>`:'<a class="btn" href="#/login">Entrar</a>';
   nav.innerHTML=(adm?admL:pubL).map(([p,t])=>`<a href="#${p}"${on(p)?' class="on" aria-current="page"':''}>${t}</a>`).join('')+`<span class="navauth">${user?'<button class="alt" data-a="logout">Sair</button>':'<a class="btn" href="#/login">Entrar</a>'}</span>`;
@@ -396,8 +398,9 @@ document.addEventListener('click',e=>{const d=document.querySelector('.idx[open]
 const authForm=(t,extra,btn)=>`<div class="auth"><aside>${MOON}<h2>Luna's Library</h2><p>Livros e universos.</p></aside><div class="auth-f"><h1>${t}</h1><form data-f="${btn[1]}">${extra}<button>${btn[0]}</button></form><p id="msg" class="mute"></p></div></div>`;
 const emailF='<label>E-mail<input name="e" type="email" required autocomplete="email"></label>';
 const passF='<label>Senha<input name="p" type="password" minlength="6" required autocomplete="current-password"></label>';
-const login=async()=>{app.innerHTML=authForm('Entrar',emailF+passF,['Entrar','login'])+'<p><a class="btn alt sm" href="#/cadastro">Criar conta</a> · <a class="btn alt sm" href="#/recuperar">Esqueci a senha</a></p>'};
-const cadastro=async()=>{app.innerHTML=authForm('Criar conta','<label>Nome de exibição<input name="n" maxlength="60"></label>'+emailF+passF,['Cadastrar','signup'])+'<p><a class="btn alt sm" href="#/login">Já tenho conta</a></p>'};
+const googleBtn='<button type="button" class="alt google-btn" data-a="google"><svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.8 32.7 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.1 8 3l5.7-5.7C34.6 6.1 29.6 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.7-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.6 16 19 13 24 13c3.1 0 5.8 1.1 8 3l5.7-5.7C34.6 6.1 29.6 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.5 26.7 36 24 36c-5.2 0-9.7-3.3-11.3-7.9l-6.5 5C9.6 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.3 4.2-4.1 5.6l6.2 5.2C40.9 36 44 30.5 44 24c0-1.3-.1-2.7-.4-3.5z"/></svg><span>Continuar com Google</span></button><div class="or"><span>ou</span></div>';
+const login=async()=>{app.innerHTML=authForm('Entrar',googleBtn+emailF+passF,['Entrar','login'])+'<p><a class="btn alt sm" href="#/cadastro">Criar conta</a> · <a class="btn alt sm" href="#/recuperar">Esqueci a senha</a></p>'};
+const cadastro=async()=>{app.innerHTML=authForm('Criar conta',googleBtn+'<label>Nome de exibição<input name="n" maxlength="60"></label>'+emailF+passF,['Cadastrar','signup'])+'<p><a class="btn alt sm" href="#/login">Já tenho conta</a></p>'};
 const recuperar=async()=>{app.innerHTML=authForm('Redefinir senha',emailF,['Enviar link','reset'])};
 const novaSenha=()=>{app.innerHTML=authForm('Nova senha',passF,['Salvar senha','newpass'])};
 
@@ -526,6 +529,7 @@ async function quiz(id){
   draw();
 }
 const actions={
+  google:async()=>{const {error}=await sb.auth.signInWithOAuth({provider:'google',options:{redirectTo:location.href.split('#')[0]}});if(error)return fail(error)},
   chtext:async b=>{const box=document.getElementById('ct-'+b.dataset.id);if(box.innerHTML){box.innerHTML='';b.textContent='Ver texto aqui';return}const {data,error}=await sb.from('chapter_contents').select('body').eq('chapter_id',b.dataset.id).maybeSingle();if(error)return fail(error);box.innerHTML=data?`<p class="mute">${data.body.length.toLocaleString('pt-BR')} caracteres · ${data.body.split(/\n{2,}/).length} parágrafos</p><div class="read">${renderBody(data.body)}</div>`:state('Sem texto.');b.textContent='Ocultar texto'},
   doimport:async b=>{const g=i=>document.getElementById(i),st=g('imp-status'),book=g('imp-book').value,pub=g('imp-pub').checked,free=g('imp-free').checked;
     if(!IMP||!IMP.chapters.length||IMP.problems.length)return toast('Selecione arquivos válidos.');
@@ -667,6 +671,47 @@ function legal(k){
   const [t,h]=P[k];
   app.innerHTML=`<article class="legal"><h1>${t}</h1><p class="upd">Última atualização: ${LEGAL_UPD}</p>${h}<p class="row lnav"><a class="btn alt sm" href="#/configuracoes">← Configurações</a><a class="btn alt sm" href="#/privacidade">Privacidade</a><a class="btn alt sm" href="#/termos">Termos de Uso</a><a class="btn alt sm" href="#/compra">Compra e Cancelamento</a></p></article>`;
 }
+const TRLANGS=[['en','English'],['es','Español']];
+async function adminTraducoes(){
+  if(!await guard())return;
+  const {data:bk,error}=await sb.from('books').select('id,slug,title').order('title');if(error)throw error;
+  app.innerHTML=`<h1>Traduções</h1><p class="mute">O texto original em português (PT-BR) não é editado aqui. Escolha um livro e um capítulo para cadastrar ou revisar as traduções em inglês e espanhol.</p>
+  <div class="box wide"><label>Livro<select id="tr-book"><option value="">Selecione um livro</option>${bk.map(b=>`<option value="${esc(b.id)}">${esc(b.title)}</option>`).join('')}</select></label>
+  <label>Capítulo<select id="tr-chap" disabled><option value="">Selecione o livro primeiro</option></select></label></div>
+  <div id="tr-area"></div>`;
+  const bookSel=document.getElementById('tr-book'),chapSel=document.getElementById('tr-chap'),area=document.getElementById('tr-area');
+  bookSel.onchange=async()=>{
+    area.innerHTML='';chapSel.disabled=true;const bid=bookSel.value;
+    if(!bid){chapSel.innerHTML='<option value="">Selecione o livro primeiro</option>';return}
+    chapSel.innerHTML='<option value="">Carregando…</option>';
+    const {data:ch,error}=await sb.from('chapters').select('id,position,title').eq('book_id',bid).order('position');
+    if(error){chapSel.innerHTML='<option value="">Não foi possível carregar os capítulos</option>';return}
+    chapSel.innerHTML='<option value="">Selecione um capítulo</option>'+ch.map(c=>`<option value="${esc(c.id)}">${c.position}. ${esc(c.title||'(sem título)')}</option>`).join('');
+    chapSel.disabled=false};
+  chapSel.onchange=()=>loadTrChapter(chapSel.value);
+}
+async function loadTrChapter(chapId){
+  const area=document.getElementById('tr-area');
+  if(!chapId){area.innerHTML='';return}
+  area.innerHTML=LOADER;
+  const [{data:ch},{data:orig},{data:trs,error}]=await Promise.all([
+    sb.from('chapters').select('title').eq('id',chapId).maybeSingle(),
+    sb.from('chapter_contents').select('body').eq('chapter_id',chapId).maybeSingle(),
+    sb.from('chapter_translations').select('id,language,title,body').eq('chapter_id',chapId)]);
+  if(error){area.innerHTML=state('Não foi possível carregar as traduções deste capítulo.',1);return}
+  const trMap=new Map((trs||[]).map(t=>[t.language,t]));
+  const langBox=([code,label])=>{const t=trMap.get(code);return `<div class="box wide"><h3>${esc(label)}</h3><form data-tr="${code}"><label>Título<input name="ti" maxlength="200" required value="${esc(t?.title||'')}"></label><label>Conteúdo<textarea name="bo" rows="10" required>${esc(t?.body||'')}</textarea></label><div class="row"><button type="submit">${t?'Salvar alterações':'Salvar tradução'}</button>${t?`<button type="button" class="alt" data-deltr="${code}">Excluir tradução</button>`:''}</div></form></div>`};
+  area.innerHTML=`<div class="box wide"><h3>Original (PT-BR) — somente leitura</h3><p class="mute">${esc(ch?.title||'')}</p><div class="read" style="max-height:260px;overflow:auto">${orig?renderBody(orig.body):state('Este capítulo ainda não tem texto original.')}</div></div>
+  ${TRLANGS.map(langBox).join('')}`;
+  area.querySelectorAll('form[data-tr]').forEach(f=>f.onsubmit=async e=>{
+    e.preventDefault();const lang=f.dataset.tr;
+    const {error}=await sb.from('chapter_translations').upsert({chapter_id:chapId,language:lang,title:f.ti.value,body:f.bo.value},{onConflict:'chapter_id,language'});
+    if(error)return fail(error);toast('Tradução salva.');loadTrChapter(chapId)});
+  area.querySelectorAll('[data-deltr]').forEach(b=>b.onclick=async()=>{
+    if(!confirm('Excluir esta tradução? O texto original em português não é afetado.'))return;
+    const {error}=await sb.from('chapter_translations').delete().eq('chapter_id',chapId).eq('language',b.dataset.deltr);
+    if(error)return fail(error);toast('Tradução excluída.');loadTrChapter(chapId)});
+}
 async function adminLivroCaps(slug){
   if(!await guard())return;
   const {data:b,error}=await sb.from('books').select('id,slug,title,status').eq('slug',slug).maybeSingle();if(error)throw error;
@@ -682,7 +727,7 @@ async function adminLivroCaps(slug){
   ${ch.length?ch.map(x=>`<div class="box"><div class="row"><b>${x.position}</b> <strong>${esc(x.title||'(sem título)')}</strong></div><p class="mute">${x.is_published?'Publicado':'Rascunho'}${x.is_free_preview?' · Prévia gratuita':''} · ${has.has(x.id)?'Com texto':'<strong>Sem texto</strong>'}</p><p class="row"><a class="btn alt sm" href="#/ler/${esc(b.slug)}/${x.position}">Ler no site</a><button class="alt sm" data-a="chtext" data-id="${x.id}">Ver texto aqui</button></p><div id="ct-${x.id}"></div></div>`).join(''):state('Este livro ainda não tem capítulos.')}`;
 }
 
-const routes=[[/^\/privacidade$/,()=>legal('p')],[/^\/termos$/,()=>legal('t')],[/^\/compra$/,()=>legal('c')],[/^\/admin\/livros\/([^/]+)$/,adminLivroCaps,1],[/^\/$/,home],[/^\/catalogo$/,catalogo],[/^\/livro\/([^/]+)$/,livro],[/^\/login$/,login],[/^\/cadastro$/,cadastro],[/^\/recuperar$/,recuperar],[/^\/minha-conta$/,conta,1],[/^\/minha-estante$/,estante,1],[/^\/quiz\/([^/]+)$/,quiz],[/^\/universos$/,universos],[/^\/universos\/([^/]+)$/,universo],[/^\/quizzes$/,quizzes],[/^\/ler\/([^/]+)\/(\d+)$/,ler],[/^\/admin$/,admin,1],[/^\/admin\/livros$/,adminLivros,1],[/^\/admin\/pedidos$/,adminPedidos,1],[/^\/admin\/usuarios$/,adminUsuarios,1],[/^\/admin\/configuracoes$/,adminPix,1],[/^\/admin\/importar$/,adminImportar,1],[/^\/admin\/avatares$/,adminAvatares,1],[/^\/checkout\/([^/]+)$/,checkout],[/^\/configuracoes$/,configuracoes],[/^\/configuracoes\/conta$/,editarConta,1]];
+const routes=[[/^\/privacidade$/,()=>legal('p')],[/^\/termos$/,()=>legal('t')],[/^\/compra$/,()=>legal('c')],[/^\/admin\/livros\/([^/]+)$/,adminLivroCaps,1],[/^\/$/,home],[/^\/catalogo$/,catalogo],[/^\/livro\/([^/]+)$/,livro],[/^\/login$/,login],[/^\/cadastro$/,cadastro],[/^\/recuperar$/,recuperar],[/^\/minha-conta$/,conta,1],[/^\/minha-estante$/,estante,1],[/^\/quiz\/([^/]+)$/,quiz],[/^\/universos$/,universos],[/^\/universos\/([^/]+)$/,universo],[/^\/quizzes$/,quizzes],[/^\/ler\/([^/]+)\/(\d+)$/,ler],[/^\/admin$/,admin,1],[/^\/admin\/livros$/,adminLivros,1],[/^\/admin\/pedidos$/,adminPedidos,1],[/^\/admin\/usuarios$/,adminUsuarios,1],[/^\/admin\/configuracoes$/,adminPix,1],[/^\/admin\/importar$/,adminImportar,1],[/^\/admin\/traducoes$/,adminTraducoes,1],[/^\/admin\/avatares$/,adminAvatares,1],[/^\/checkout\/([^/]+)$/,checkout],[/^\/configuracoes$/,configuracoes],[/^\/configuracoes\/conta$/,editarConta,1]];
 async function route(){
   header();onscroll=null;const path=(location.hash.slice(1)||'/').split('?')[0];
   const raw=location.hash.slice(1);
