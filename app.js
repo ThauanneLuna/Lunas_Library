@@ -529,7 +529,7 @@ async function quiz(id){
   draw();
 }
 const actions={
-  google:async()=>{const {error}=await sb.auth.signInWithOAuth({provider:'google',options:{redirectTo:location.href.split('#')[0]}});if(error)return fail(error)},
+  google:async()=>{const {error}=await sb.auth.signInWithOAuth({provider:'google',options:{redirectTo:'https://thauanneluna.github.io/Lunas_Library'}});if(error)return fail(error)},
   chtext:async b=>{const box=document.getElementById('ct-'+b.dataset.id);if(box.innerHTML){box.innerHTML='';b.textContent='Ver texto aqui';return}const {data,error}=await sb.from('chapter_contents').select('body').eq('chapter_id',b.dataset.id).maybeSingle();if(error)return fail(error);box.innerHTML=data?`<p class="mute">${data.body.length.toLocaleString('pt-BR')} caracteres · ${data.body.split(/\n{2,}/).length} parágrafos</p><div class="read">${renderBody(data.body)}</div>`:state('Sem texto.');b.textContent='Ocultar texto'},
   doimport:async b=>{const g=i=>document.getElementById(i),st=g('imp-status'),book=g('imp-book').value,pub=g('imp-pub').checked,free=g('imp-free').checked;
     if(!IMP||!IMP.chapters.length||IMP.problems.length)return toast('Selecione arquivos válidos.');
