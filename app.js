@@ -733,7 +733,9 @@ async function route(){
   const raw=location.hash.slice(1);
   if(/^(access_token|error)=/.test(raw)){
     const hp=new URLSearchParams(raw);
-    if(hp.get('error')||hp.get('error_code')){app.innerHTML='<h1>Link inválido ou expirado</h1>'+state('Este link de confirmação já foi usado ou expirou. Se você já confirmou o e-mail, basta entrar com e-mail e senha.')+'<p class="row"><a class="btn" href="#/login">Entrar</a><a class="btn alt" href="#/recuperar">Esqueci a senha</a></p>';return}
+    console.log('[LL-DEBUG] hash de retorno OAuth/confirmação:',raw);
+    console.log('[LL-DEBUG] params:',Object.fromEntries(hp.entries()));
+    if(hp.get('error')||hp.get('error_code')){const detail=[hp.get('error'),hp.get('error_code'),hp.get('error_description')].filter(Boolean).map(x=>decodeURIComponent(x.replace(/\+/g,' '))).join(' — ');app.innerHTML='<h1>Link inválido ou expirado</h1>'+state('Este link de confirmação já foi usado ou expirou. Se você já confirmou o e-mail, basta entrar com e-mail e senha.')+(detail?`<p class="mute" style="font-family:monospace;font-size:.8rem">Detalhe técnico: ${esc(detail)}</p>`:'')+'<p class="row"><a class="btn" href="#/login">Entrar</a><a class="btn alt" href="#/recuperar">Esqueci a senha</a></p>';return}
     app.innerHTML=LOADER;return}
   if(path!==route.last){scrollTo(0,0);route.last=path}
   for(const [re,fn,needAuth] of routes){const m=path.match(re);if(!m)continue;
@@ -744,5 +746,5 @@ async function route(){
   app.innerHTML=state('Página não encontrada.');
 }
 addEventListener('hashchange',route);
-sb.auth.onAuthStateChange((ev,s)=>{const id=s?.user?.id;if(ev==='PASSWORD_RECOVERY'){user=s.user;header();return novaSenha()}
+sb.auth.onAuthStateChange((ev,s)=>{console.log('[LL-DEBUG] onAuthStateChange:',ev,'session?',!!s,'user?',s?.user?.email||null);const id=s?.user?.id;if(ev==='PASSWORD_RECOVERY'){user=s.user;header();return novaSenha()}
   if(ev==='INITIAL_SESSION'||id!==user?.id){user=s?.user||null;isAdmin=false;const uid=user?.id;roleP=uid?sb.from('user_roles').select('role').eq('user_id',uid).eq('role','admin').maybeSingle().then(({data})=>{if(user?.id===uid){isAdmin=!!data;header()}},()=>{}):Promise.resolve();loadProf();const th=user?.user_metadata?.theme;if(['light','dark','sepia'].includes(th))applyTheme(th);route()}});
