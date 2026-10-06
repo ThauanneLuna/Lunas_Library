@@ -349,4 +349,400 @@ function header(){
 }
 async function home(){
   const [bk,{data:un},{data:ps},{data:pg}]=await Promise.all([books(),sb.from('universes').select('slug,name,description').order('sort_order'),sb.from('posts').select('body,created_at,is_spoiler,profiles(display_name,avatar_path)').order('created_at',{ascending:false}).limit(3),user?sb.from('reading_progress').select('book_id,progress_percent').eq('user_id',user.id).order('last_read_at',{ascending:false}).limit(1).maybeSingle():Promise.resolve({data:null})]);
-  const feat=bk.find(b=>b.is_launch_active)||bk.find(b=>b.published_chapter_count)||bk[0],cont=pg&&bk.find(b=>b.id===pg.book_id),gs=genresO
+  const feat=bk.find(b=>b.is_launch_active)||bk.find(b=>b.published_chapter_count)||bk[0],cont=pg&&bk.find(b=>b.id===pg.book_id),gs=genresOf(bk),rest=bk.filter(b=>!b.genre);
+  const hero=feat?`<section class="feat"><div><p class="eyebrow">${feat.is_launch_active?'Lançamento':'Em destaque'}</p><h1>${esc(feat.title)}</h1>${by(feat)}<div>${gtag(feat)}</div>${feat.description?`<p class="lead">${esc(feat.description)}</p>`:''}<div class="row"><a class="btn big" href="#/livro/${esc(feat.slug)}">Conhecer o livro</a><a class="btn alt big" href="#/catalogo">Ver catálogo</a>${user?'':'<a class="btn alt big" href="#/cadastro">Criar conta</a>'}</div></div><div class="feat-c"><div class="cover">${coverHtml(feat)}</div></div></section>`:`<section class="hero"><h1>Luna's Library</h1><p class="lead">Livros e universos.</p></section>`;
+  const contH=cont?`<a class="cont" href="#/livro/${esc(cont.slug)}"><div class="cover">${coverHtml(cont)}</div><div><p class="eyebrow">Continue lendo</p><h3>${esc(cont.title)}</h3>${by(cont)}<div class="pbar" role="progressbar" aria-valuenow="${pg.progress_percent}" aria-valuemin="0" aria-valuemax="100"><i style="width:${pg.progress_percent}%"></i></div></div></a>`:'';
+  const shelves=shelf('Lançamentos',bk.filter(b=>b.is_launch_active),'#/catalogo?f=lan')+(gs.length?gs.map(g=>shelf(g,bk.filter(b=>b.genre===g),'#/catalogo?g='+encodeURIComponent(g))).join('')+shelf('Mais livros',rest,'#/catalogo'):shelf('Catálogo',bk,'#/catalogo'));
+  app.innerHTML=hero+contH+(shelves||state('Nenhum livro cadastrado ainda.'))+
+  `<section><div class="sh"><h2>Universos</h2><a class="btn alt sm" href="#/universos">Explorar</a></div>${un?.length?`<div class="ugrid">${un.slice(0,3).map(uniCard).join('')}</div>`:state('Nenhum universo cadastrado ainda.')}</section>`;
+}
+async function catalogo(){
+  const bk=await books(),P=new URLSearchParams(location.hash.split('?')[1]||'');
+  let q=P.get('q')||'',g=P.get('g')||'',f=P.get('f')||'',o='';
+  const gs=genresOf(bk),FL=[['','Todos'],['lan','Lançamentos'],['dis','Disponíveis'],['brev','Em breve']];
+  const norm=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+  const chip=(k,v,t)=>`<button class="chip" data-k="${k}" data-v="${esc(v)}" aria-pressed="false">${esc(t)}</button>`;
+  app.innerHTML=`${await paidBanner()}<div class="sh"><h1>Catálogo</h1><span class="mute" id="cn"></span></div><div class="bar"><label class="sq"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><input id="cq" type="search" placeholder="Buscar por título, autora ou gênero" value="${esc(q)}" aria-label="Buscar"></label><select id="co" class="sm" aria-label="Ordenar"><option value="">Ordem padrão</option><option value="az">Título A–Z</option><option value="lo">Menor preço</option><option value="hi">Maior preço</option></select></div><div class="chips" style="margin-bottom:.6rem">${FL.map(([v,t])=>chip('f',v,t)).join('')}</div>${gs.length?`<div class="chips" style="margin-bottom:1.4rem">${chip('g','','Todos os gêneros')}${gs.map(x=>chip('g',x,x)).join('')}</div>`:''}<div id="cl"></div>`;
+  const draw=()=>{
+    let L=bk.filter(b=>(!g||b.genre===g)&&(!f||(f==='lan'?b.is_launch_active:f==='dis'?b.is_purchasable:!b.published_chapter_count))&&(!q||norm([b.title,b.author,b.genre,b.description].join(' ')).includes(norm(q))));
+    if(o==='az')L=[...L].sort((a,b)=>a.title.localeCompare(b.title,'pt-BR'));
+    if(o==='lo'||o==='hi')L=[...L].sort((a,b)=>(a.effective_price_cents-b.effective_price_cents)*(o==='lo'?1:-1));
+    document.getElementById('cn').textContent=L.length+(L.length===1?' livro':' livros');
+    document.getElementById('cl').innerHTML=L.length?`<div class="grid">${L.map(card).join('')}</div>`:state('Nenhum livro encontrado com esses filtros.');
+    app.querySelectorAll('.chip').forEach(c=>c.setAttribute('aria-pressed',String((c.dataset.k==='f'?f:g)===c.dataset.v)))};
+  app.querySelectorAll('.chip').forEach(c=>c.onclick=()=>{if(c.dataset.k==='f')f=c.dataset.v;else g=c.dataset.v;draw()});
+  document.getElementById('cq').oninput=e=>{q=e.target.value;draw()};document.getElementById('co').onchange=e=>{o=e.target.value;draw()};draw();
+}
+async function estante(){
+  const [{data,error},{data:pg}]=await Promise.all([sb.from('book_entitlements').select('books(*)').eq('user_id',user.id).eq('status','active'),sb.from('reading_progress').select('book_id,progress_percent,last_read_at').eq('user_id',user.id).order('last_read_at',{ascending:false})]);
+  if(error)throw error;
+  const P=new Map();(pg||[]).forEach(x=>{if(!P.has(x.book_id))P.set(x.book_id,x.progress_percent)});
+  const L=data.map(x=>x.books).filter(Boolean),cur=L.find(b=>P.has(b.id));
+  const item=b=>`<a class="bk" href="#/livro/${esc(b.slug)}"><div class="cover">${coverHtml(b)}</div><div class="bk-i"><h3>${esc(b.title)}</h3>${by(b)}${P.has(b.id)?`<div class="pbar" role="progressbar" aria-valuenow="${P.get(b.id)}" aria-valuemin="0" aria-valuemax="100"><i style="width:${P.get(b.id)}%"></i></div><span class="mute">${P.get(b.id)}% lido</span>`:'<span class="mute">Ainda não iniciado</span>'}</div></a>`;
+  app.innerHTML=`${await paidBanner()}<h1>Minha estante</h1>${cur?`<a class="cont" href="#/livro/${esc(cur.slug)}"><div class="cover">${coverHtml(cur)}</div><div><p class="eyebrow">Continue lendo</p><h3>${esc(cur.title)}</h3>${by(cur)}<div class="pbar"><i style="width:${P.get(cur.id)}%"></i></div></div></a>`:''}${L.length?`<div class="grid">${L.map(item).join('')}</div>`:state('Você ainda não possui livros com acesso liberado. Pedidos pendentes aparecem em Minha conta.')}`;
+}
+async function universos(){
+  const {data,error}=await sb.from('universes').select('slug,name,description').order('sort_order');if(error)throw error;
+  app.innerHTML=`${seg('u')}<h1>Universos</h1>${data.length?`<div class="ugrid">${data.map(uniCard).join('')}</div>`:state('Nenhum universo cadastrado ainda.')}`;
+}
+async function universo(slug){
+  const {data:u,error}=await sb.from('universes').select('id,name,description').eq('slug',slug).maybeSingle();if(error)throw error;
+  if(!u){app.innerHTML=state('Universo não encontrado.');return}
+  const {data:it,error:e2}=await sb.from('universe_items').select('*').eq('universe_id',u.id).order('position');if(e2)throw e2;
+  const grp={};it.forEach(i=>(grp[i.item_type]=grp[i.item_type]||[]).push(i));
+  app.innerHTML=`<div class="uhead"><b>${esc(ini(u.name))}</b><div><h1>${esc(u.name)}</h1>${u.description?`<p>${esc(u.description)}</p>`:''}</div></div>${it.length?Object.entries(grp).map(([t,L])=>`<h2>${IT[t]||t}</h2>${L.map(i=>`<div class="box"><h3>${esc(i.title)}</h3>${i.body?`<p>${esc(i.body)}</p>`:''}${i.url?`<a class="btn alt sm" href="${esc(i.url)}" target="_blank" rel="noopener noreferrer">Abrir link</a>`:''}</div>`).join('')}`).join(''):state('Este universo ainda não tem conteúdo.')}<p><a class="btn alt sm" href="#/universos">Todos os universos</a></p>`;
+}
+
+document.addEventListener('click',e=>{const d=document.querySelector('.idx[open]');if(d&&!d.contains(e.target))d.open=false});
+// ---- autenticação ----
+const authForm=(t,extra,btn)=>`<div class="auth"><aside>${MOON}<h2>Luna's Library</h2><p>Livros e universos.</p></aside><div class="auth-f"><h1>${t}</h1><form data-f="${btn[1]}">${extra}<button>${btn[0]}</button></form><p id="msg" class="mute"></p></div></div>`;
+const emailF='<label>E-mail<input name="e" type="email" required autocomplete="email"></label>';
+const passF='<label>Senha<input name="p" type="password" minlength="6" required autocomplete="current-password"></label>';
+const googleBtn='<button type="button" class="alt google-btn" data-a="google"><svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.8 32.7 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.1 8 3l5.7-5.7C34.6 6.1 29.6 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.7-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.6 16 19 13 24 13c3.1 0 5.8 1.1 8 3l5.7-5.7C34.6 6.1 29.6 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.5 26.7 36 24 36c-5.2 0-9.7-3.3-11.3-7.9l-6.5 5C9.6 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.3 4.2-4.1 5.6l6.2 5.2C40.9 36 44 30.5 44 24c0-1.3-.1-2.7-.4-3.5z"/></svg><span>Continuar com Google</span></button><div class="or"><span>ou</span></div>';
+const login=async()=>{app.innerHTML=authForm('Entrar',googleBtn+emailF+passF,['Entrar','login'])+'<p><a class="btn alt sm" href="#/cadastro">Criar conta</a> · <a class="btn alt sm" href="#/recuperar">Esqueci a senha</a></p>'};
+const cadastro=async()=>{app.innerHTML=authForm('Criar conta',googleBtn+'<label>Nome de exibição<input name="n" maxlength="60"></label>'+emailF+passF,['Cadastrar','signup'])+'<p><a class="btn alt sm" href="#/login">Já tenho conta</a></p>'};
+const recuperar=async()=>{app.innerHTML=authForm('Redefinir senha',emailF,['Enviar link','reset'])};
+const novaSenha=()=>{app.innerHTML=authForm('Nova senha',passF,['Salvar senha','newpass'])};
+
+// ---- ações e formulários ----
+const msg=t=>{const m=document.getElementById('msg');if(m)m.textContent=t};
+const ERR={book_not_purchasable:'Este livro ainda não está disponível para compra.',already_owned:'Você já possui este livro.'};
+const fail=e=>toast(ERR[e.message]||e.message);
+
+// ======================= v8: checkout em etapas =======================
+const CK={slug:null,step:1,order:null,pix:undefined,qr:null,pr:null};
+const CKS=['Produto','Seus dados','Pagamento','Confirmação'];
+const ckStepper=n=>`<ol class="ckst" aria-label="Etapas da compra">${CKS.map((t,i)=>`<li class="${i+1===n?'on':i+1<n?'ok':''}"${i+1===n?' aria-current="step"':''}><b>${i+1<n?'✓':i+1}</b><span>${t}</span></li>`).join('')}</ol>`;
+async function ckPixFor(orderId){
+  // 1) função segura do servidor (opcional)  2) tabela, se o RLS permitir  3) nada: o aviso diz para usar o e-mail
+  let p=null;
+  try{const {data,error}=await sb.rpc('get_order_pix',{p_order_id:orderId});if(!error&&data)p=Array.isArray(data)?data[0]:data}catch(e){}
+  if(!p){try{const {data}=await sb.from('pix_settings').select('*').maybeSingle();if(data)p=data}catch(e){}}
+  let qr=null;if(p?.qr_code_path){try{qr=(await sb.storage.from('pix-assets').createSignedUrl(p.qr_code_path,3600)).data?.signedUrl||null}catch(e){}}
+  return {p,qr};
+}
+async function ckLoadOrder(b){
+  const {data:o}=await sb.from('orders').select('id,amount_cents,order_number,created_at').eq('user_id',user.id).eq('book_id',b.id).eq('status','pending').order('created_at',{ascending:false}).limit(1).maybeSingle();
+  if(!o)return null;
+  const {data:pay}=await sb.from('payments').select('id,status').eq('order_id',o.id).in('status',['pending','proof_submitted']).order('created_at',{ascending:false}).limit(1).maybeSingle();
+  return {...o,pay};
+}
+async function checkout(slug){
+  await roleP;
+  const {data:b,error}=await sb.from('book_catalog').select('*').eq('slug',slug).maybeSingle();if(error)throw error;
+  if(!b){app.innerHTML=state('Livro não encontrado.');return}
+  if(isAdmin){app.innerHTML=`<div class="ck"><h1>${esc(b.title)}</h1><p class="state">Conta administrativa: você tem acesso total aos livros e não precisa comprar.</p><p class="row"><a class="btn" href="#/livro/${esc(b.slug)}">Voltar ao livro</a><a class="btn alt" href="#/admin/livros/${esc(b.slug)}">Revisar capítulos</a></p></div>`;return}
+  if(!user){sessionStorage.setItem('ll-next','/checkout/'+slug);
+    app.innerHTML=`<div class="ck">${ckStepper(1)}<h1>Comprar ${esc(b.title)}</h1><p class="state">Entre na sua conta ou crie uma para comprar este livro. É por ela que o acesso será liberado depois da confirmação do pagamento.</p><p class="row"><a class="btn" href="#/login">Entrar</a><a class="btn alt" href="#/cadastro">Criar conta</a></p></div>`;return}
+  if(CK.slug!==slug){CK.slug=slug;CK.step=1;CK.order=null;CK.pix=undefined;CK.qr=null}
+  const owned=!!(await sb.from('book_entitlements').select('id').eq('user_id',user.id).eq('book_id',b.id).eq('status','active').maybeSingle()).data;
+  if(owned){CK.step=4;CK.done=true}else CK.done=false;
+  if(!owned){CK.order=await ckLoadOrder(b);if(CK.order&&CK.step<3)CK.step=3;if(CK.order&&CK.step===3&&CK.pix===undefined)CK.pix=await ckPixFor(CK.order.id);
+    if(!CK.order){const {data:l}=await sb.from('orders').select('id,payments(status,rejected_reason)').eq('user_id',user.id).eq('book_id',b.id).neq('status','pending').order('created_at',{ascending:false}).limit(1).maybeSingle();CK.last=l;if(CK.step>=3)CK.step=1}}
+  CK.book=b;ckRender();
+}
+function ckRender(){
+  const b=CK.book,st=CK.step,price=brl(b.effective_price_cents);
+  const head=`<div class="ck">${ckStepper(st)}`;
+  if(st===1){
+    const rej=CK.last&&topPay(CK.last.payments)==='rejected';
+    app.innerHTML=`${head}<h1>Sua compra</h1>${rej?`<p class="state bad">Pagamento recusado. Verifique o pagamento e faça um novo pedido: você poderá enviar outro comprovante. O livro continua bloqueado.</p>`:''}<div class="ckbook"><div class="cover">${coverHtml(b)}</div><div><h2 style="margin:.1rem 0">${esc(b.title)}</h2>${by(b)}${b.description?`<p class="mute" style="display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">${esc(b.description)}</p>`:''}<p class="price">${priceHtml(b)}</p></div></div>
+    <div class="ckrows"><div><span>Quantidade</span><span>1 (livro digital)</span></div><div><span>Subtotal</span><span>${price}</span></div><div class="tot"><span>Total</span><span>${price}</span></div></div>
+    ${b.is_purchasable?`<div class="ckrow"><button data-a="ckgo" data-s="2">Continuar</button><a class="btn alt" href="#/livro/${esc(b.slug)}">Voltar ao livro</a></div>`:state('A compra deste livro ainda não está disponível.')}</div>`;return}
+  if(st===2){
+    const nm=myProf?.display_name||user.user_metadata?.display_name||'';
+    app.innerHTML=`${head}<h1>Seus dados</h1><p class="mute">Confira os dados do comprador. O pedido fica ligado a esta conta, e o acesso ao livro é liberado nela.</p>
+    <form data-f="ckdados" style="max-width:480px"><label>Nome<input name="n" maxlength="60" required value="${esc(nm)}" autocomplete="name"></label><label>E-mail<input name="e" type="email" value="${esc(user.email)}" readonly aria-describedby="ckem"></label><p class="mute" id="ckem">O e-mail é o da sua conta. Para trocá-lo, use Configurações.</p>
+    <div class="ckrow"><button>Continuar para o pagamento</button><button type="button" class="alt" data-a="ckgo" data-s="1">Voltar</button></div></form></div>`;return}
+  if(st===3){
+    const o=CK.order,pp=CK.pix?.p,qr=CK.pix?.qr,conf=!!(pp&&(pp.copy_paste_code||pp.pix_key||qr));
+    const proofDone=o?.pay?.status==='proof_submitted';
+    app.innerHTML=`${head}<h1>Pagamento via Pix</h1><p class="mute">Pedido ${ordN(o.order_number)} · ${esc(b.title)}</p>
+    ${conf?`<div class="ckpay"><div>${qr?`<img class="ckqr" src="${esc(qr)}" alt="QR Code Pix">`:'<p class="mute">QR Code não cadastrado.</p>'}</div><div><p class="ckval">Pague ${brl(o.amount_cents)} via Pix</p>${pp.copy_paste_code?`<p class="eyebrow">Pix Copia e Cola</p><code class="ckcode">${esc(pp.copy_paste_code)}</code><button type="button" class="alt sm" data-a="copy" data-c="${esc(pp.copy_paste_code)}">Copiar código</button>`:''}${pp.receiver_name?`<p>Recebedor: ${esc(pp.receiver_name)}</p>`:''}${pp.pix_key?`<p>Chave Pix: ${esc(pp.pix_key)}</p>`:''}<p class="mute">${pp.instructions?esc(pp.instructions):'Abra o app do seu banco, escolha pagar com Pix e use o QR Code ou o código. Confira o valor antes de confirmar.'}</p></div></div>`
+    :`<div class="ckno"><p class="ckval">Pague ${brl(o.amount_cents)} via Pix</p><p>Os dados do Pix deste pedido foram enviados para o seu e-mail (${esc(user.email)}). Se não encontrar, veja o spam ou peça o reenvio.</p><p><button class="alt sm" data-a="resend" data-id="${o.id}">Reenviar instruções por e-mail</button></p></div>`}
+    <div class="ckno"><h3 style="margin-top:0">Depois de pagar, envie o comprovante</h3>${proofDone?'<p>Comprovante já enviado. Você pode enviar outro arquivo, se precisar.</p>':''}<div><label>Comprovante (imagem ou PDF, até 5 MB)<input type="file" id="proof" accept="image/*,application/pdf"></label><div class="ckrow" style="margin-top:.8rem"><button type="button" data-a="paid" data-m="file">Enviar comprovante</button>${proofDone?'':'<button type="button" class="alt" data-a="paid" data-m="none">Já paguei, sem comprovante</button>'}</div></div></div>
+    <div class="ckrow"><button class="alt" data-a="ckgo" data-s="4">Ver status do pedido</button></div></div>`;return}
+  // etapa 4 — confirmação
+  if(CK.done){app.innerHTML=`${head}<div class="ckdone"><span class="tag">🟢 Pagamento confirmado · Acesso liberado</span><h2>Pagamento confirmado!</h2><p>Seu acesso a <strong>${esc(b.title)}</strong> foi liberado.</p><div class="ckrow" style="justify-content:center"><a class="btn big" href="#/minha-estante">Ir para minha estante</a><a class="btn alt big" href="#/livro/${esc(b.slug)}">Abrir o livro</a></div></div></div>`;return}
+  const o=CK.order,ps=o?.pay?.status;
+  if(!o){app.innerHTML=`${head}<h1>Status do pedido</h1>${state('Você não tem pedido em aberto para este livro.')}<div class="ckrow"><button data-a="ckgo" data-s="1">Comprar o livro</button></div></div>`;return}
+  const L=[['Pedido criado',1],['Aguardando pagamento',ps?1:0],['Comprovante enviado',ps==='proof_submitted'?1:0],['Aguardando confirmação',ps==='proof_submitted'?1:0],['Pagamento confirmado',0],['Acesso liberado',0]];
+  const now=L.findIndex(x=>!x[1]);const tl=L.map((x,i)=>`<li class="${x[1]?'ok':i===now?'now':''}"><i></i>${x[0]}</li>`).join('');
+  app.innerHTML=`${head}<h1>Status do pedido</h1><p class="mute">Pedido ${ordN(o.order_number)} · ${esc(b.title)} · ${brl(o.amount_cents)}</p><ul class="cktl">${tl}</ul>
+  <p>${ps==='proof_submitted'?'Recebemos o seu comprovante. A administração vai conferir o pagamento. O livro continua bloqueado até essa confirmação.':'O livro continua bloqueado até o pagamento ser confirmado pela administração.'}</p>
+  <div class="ckrow"><button data-a="ckrefresh">Atualizar status</button>${ps==='proof_submitted'?'':'<button class="alt" data-a="ckgo" data-s="3">Voltar ao pagamento</button>'}<a class="btn alt" href="#/livro/${esc(b.slug)}">Voltar ao livro</a></div></div>`;
+}
+const paidBanner=async()=>{
+  if(!user)return '';
+  try{const {data}=await sb.from('orders').select('id,books(title,slug)').eq('user_id',user.id).eq('status','paid').order('paid_at',{ascending:false}).limit(3);
+    const seen=JSON.parse(localStorage.getItem('ll-ack')||'[]');
+    const n=(data||[]).filter(o=>!seen.includes(o.id));
+    return n.map(o=>`<div class="paidban"><h3>Pagamento confirmado!</h3><p>Seu acesso a <strong>${esc(o.books?.title||'seu livro')}</strong> foi liberado.</p><p class="row"><a class="btn" href="#/minha-estante" data-ack="${o.id}">Ir para minha estante</a><button class="alt sm" data-a="ack" data-id="${o.id}">Dispensar</button></p></div>`).join('');
+  }catch(e){return ''}
+};
+
+const ordN=n=>'#'+String(n||0).padStart(4,'0');
+const STAT={pending:'🟡 Aguardando pagamento',proof_submitted:'🟠 Pagamento em análise',confirmed:'🟢 Pagamento confirmado · Acesso liberado',paid:'🟢 Pagamento confirmado · Acesso liberado',rejected:'🔴 Pagamento recusado · livro continua bloqueado',cancelled:'⚪ Pedido cancelado',expired:'⚪ Pedido expirado'};
+async function mailOrder(id,quiet){
+  if(!id)return quiet?0:toast('Pedido criado, mas não consegui identificar o pedido para enviar o e-mail. Use "Reenviar instruções por e-mail".');
+  const {data,error}=await sb.functions.invoke('send-order-email',{body:{order_id:id}});
+  if(!error&&!(data&&data.error))return toast('Enviamos as instruções de pagamento para o seu e-mail.');
+  if(quiet)return;
+  let c=data&&data.error||'',st=error&&error.context&&error.context.status;
+  if(error&&!c){try{c=(await error.context.json()).error}catch(e){}}
+  console.error('send-order-email falhou:',st,c,error||data);
+  const M={email_not_configured:'Pedido criado, mas o envio por e-mail ainda não está configurado. Fale com a administração.',too_soon:'O e-mail foi enviado há pouco. Confira sua caixa de entrada (e o spam).'};
+  toast(M[c]||(st===404&&!c?'Pedido criado, mas a função de e-mail não está publicada no servidor (erro 404).':'Pedido criado, mas o e-mail falhou'+(st||c?` (${[st,c].filter(Boolean).join(': ')})`:'')+'. Use "Reenviar instruções por e-mail".'));
+}
+const seg=a=>`<div class="seg"><a href="#/universos"${a==='u'?' class="on" aria-current="page"':''}>Universos</a><a href="#/quizzes"${a==='q'?' class="on" aria-current="page"':''}>Quizzes</a></div>`;
+async function quizzes(){
+  const {data,error}=await sb.from('quizzes').select('id,title,description,books(title),universes(name)').eq('is_published',true).order('created_at');if(error)throw error;
+  app.innerHTML=`${seg('q')}<h1>Quizzes</h1>${data.length?data.map(q=>`<div class="box"><h3>${esc(q.title)}</h3>${q.description?`<p>${esc(q.description)}</p>`:''}${q.books?.title||q.universes?.name?`<p class="mute">${esc(q.books?.title||q.universes?.name)}</p>`:''}<a class="btn" href="#/quiz/${q.id}">Responder quiz</a></div>`).join(''):state('Nenhum quiz cadastrado ainda.')}`;
+}
+async function quiz(id){
+  app.innerHTML=seg('q')+LOADER;
+  let {data:q,error}=await sb.from('quizzes').select('id,title,description,kind').eq('id',id).maybeSingle();
+  if(error)({data:q,error}=await sb.from('quizzes').select('id,title,description').eq('id',id).maybeSingle());
+  if(error)throw error;
+  if(!q){app.innerHTML=seg('q')+state('Quiz não encontrado.');return}
+  const {data:qs,error:e2}=await sb.from('quiz_questions').select('id,position,prompt,quiz_options(id,position,label)').eq('quiz_id',id).order('position');if(e2)throw e2;
+  const head=`${seg('q')}<h1>${esc(q.title)}</h1>`;
+  if(!qs.length){app.innerHTML=head+state('Este quiz ainda não tem perguntas.');return}
+  const N=qs.length,pers=q.kind==='personality';let i=0,A={};
+  const draw=()=>{
+    if(!user){app.innerHTML=`${head}${q.description?`<p>${esc(q.description)}</p>`:''}<div class="box"><p>Entre na sua conta para responder.</p><p class="row"><button id="qlogin">Entrar para responder</button></p></div>`;
+      document.getElementById('qlogin').onclick=()=>{sessionStorage.setItem('ll-next','/quiz/'+id);go('/login')};return}
+    const x=qs[i],sel=A[x.id];
+    app.innerHTML=`${head}<div class="qprog"><span>Pergunta ${i+1} de ${N}</span><div class="pbar" role="progressbar" aria-valuemin="1" aria-valuemax="${N}" aria-valuenow="${i+1}"><i style="width:${(i+1)/N*100}%"></i></div></div><div class="box qcard"><h2 class="qp">${esc(x.prompt)}</h2><div class="qopts" role="radiogroup" aria-label="Alternativas">${[...x.quiz_options].sort((a,b)=>a.position-b.position).map(o=>`<button type="button" class="qopt" role="radio" aria-checked="${o.id===sel}" data-o="${o.id}">${esc(o.label)}</button>`).join('')}</div><p class="row">${i?'<button type="button" class="alt" id="qprev">Voltar</button>':''}<button type="button" id="qnext"${sel?'':' disabled'}>${i===N-1?'Ver resultado':'Próxima'}</button></p><p class="mute" id="qerr" role="alert"></p></div>`;
+    const nx=document.getElementById('qnext');
+    app.querySelectorAll('.qopt').forEach(b=>b.onclick=()=>{A[x.id]=b.dataset.o;app.querySelectorAll('.qopt').forEach(c=>c.setAttribute('aria-checked',String(c===b)));nx.disabled=false});
+    if(i)document.getElementById('qprev').onclick=()=>{i--;draw()};
+    nx.onclick=async()=>{
+      if(!A[x.id])return;
+      if(i<N-1){i++;draw();window.scrollTo(0,0);return}
+      nx.disabled=true;nx.textContent='Calculando…';
+      const {data,error}=await sb.rpc(pers?'submit_personality_quiz':'submit_quiz_attempt',{p_quiz_id:id,p_answers:A});
+      if(error||!data){nx.disabled=false;nx.textContent='Ver resultado';document.getElementById('qerr').textContent='Não foi possível enviar suas respostas agora. Tente novamente.';return}
+      app.innerHTML=`${head}<div class="box qres"><p class="eyebrow">${pers?'Seu resultado':'Resultado'}</p>${pers?`<h2>Você é ${esc(data.name)}!</h2><p class="qdesc">${esc(data.description)}</p>`:`<h2>${data.score} de ${data.max_score}</h2><p class="qdesc">Você acertou ${data.score} de ${data.max_score} perguntas.</p>`}<p class="row"><button id="qredo">Refazer o quiz</button><a class="btn alt" href="#/quizzes">Ver outros quizzes</a></p></div>`;
+      document.getElementById('qredo').onclick=()=>{A={};i=0;draw();window.scrollTo(0,0)};window.scrollTo(0,0)};
+  };
+  draw();
+}
+const actions={
+  google:async()=>{const {error}=await sb.auth.signInWithOAuth({provider:'google',options:{redirectTo:'https://thauanneluna.github.io/Lunas_Library'}});if(error)return fail(error)},
+  chtext:async b=>{const box=document.getElementById('ct-'+b.dataset.id);if(box.innerHTML){box.innerHTML='';b.textContent='Ver texto aqui';return}const {data,error}=await sb.from('chapter_contents').select('body').eq('chapter_id',b.dataset.id).maybeSingle();if(error)return fail(error);box.innerHTML=data?`<p class="mute">${data.body.length.toLocaleString('pt-BR')} caracteres · ${data.body.split(/\n{2,}/).length} parágrafos</p><div class="read">${renderBody(data.body)}</div>`:state('Sem texto.');b.textContent='Ocultar texto'},
+  doimport:async b=>{const g=i=>document.getElementById(i),st=g('imp-status'),book=g('imp-book').value,pub=g('imp-pub').checked,free=g('imp-free').checked;
+    if(!IMP||!IMP.chapters.length||IMP.problems.length)return toast('Selecione arquivos válidos.');
+    if(!confirm(`Importar ${IMP.chapters.length} capítulos? Capítulos já existentes serão atualizados.`))return;
+    const {data:ex,error:e0}=await sb.from('chapters').select('id,position').eq('book_id',book);if(e0)return fail(e0);
+    const have=new Map(ex.map(x=>[x.position,x.id])),meta=c=>({title:c.title,is_published:pub,is_free_preview:free&&c.n===1});
+    const novos=IMP.chapters.filter(c=>!have.has(c.n)).map(c=>({book_id:book,position:c.n,...meta(c)}));
+    st.textContent='Criando capítulos…';
+    if(novos.length){const {data:cr,error}=await sb.from('chapters').insert(novos).select('id,position');if(error)return fail(error);cr.forEach(x=>have.set(x.position,x.id))}
+    for(const c of IMP.chapters.filter(c=>ex.some(x=>x.position===c.n))){const {error}=await sb.from('chapters').update(meta(c)).eq('id',have.get(c.n));if(error)return fail(error)}
+    const L=IMP.chapters;
+    for(let i=0;i<L.length;i+=4){st.textContent=`Enviando texto: ${Math.min(i+4,L.length)} de ${L.length}…`;const {error}=await sb.from('chapter_contents').upsert(L.slice(i,i+4).map(c=>({chapter_id:have.get(c.n),body:c.body})),{onConflict:'chapter_id'});if(error)return fail(error)}
+    if(g('imp-syn').checked&&IMP.sinopse){const {error}=await sb.from('books').update({description:IMP.sinopse}).eq('id',book);if(error)return fail(error)}
+    st.textContent=`Concluído: ${L.length} capítulos importados.`;toast('Importação concluída.')},
+  resetmail:async()=>{const {error}=await sb.auth.resetPasswordForEmail(user.email,{redirectTo:location.href.split('#')[0]});toast(error?error.message:'Enviamos um link para o seu e-mail.')},
+  confirm:async b=>{if(!confirm('Confirmar este pagamento e liberar o acesso ao livro?'))return;const {error}=await sb.rpc('admin_confirm_payment',{p_payment_id:b.dataset.id});if(error)return fail(error);toast('Pagamento confirmado.');route()},
+  reject:async b=>{const r=prompt('Motivo da recusa (opcional):');if(r===null)return;const {error}=await sb.rpc('admin_reject_payment',{p_payment_id:b.dataset.id,p_reason:r||null});if(error)return fail(error);toast('Pagamento recusado.');route()},
+  revoke:async b=>{if(!confirm('Revogar o acesso deste usuário ao livro?'))return;const {error}=await sb.rpc('admin_revoke_access',{p_user_id:b.dataset.u,p_book_id:b.dataset.b});if(error)return fail(error);toast('Acesso revogado.');route()},
+  theme:async b=>{applyTheme(b.dataset.t);document.querySelectorAll('[data-a=theme]').forEach(x=>x.setAttribute('aria-pressed',x===b));if(user){const {error}=await sb.auth.updateUser({data:{theme:b.dataset.t}});toast(error?'Não foi possível salvar na conta.':'Preferência salva.')}},
+  fs:b=>{const v=Math.min(1.8,Math.max(1.05,(+localStorage.getItem('ll-fs')||1.3)+b.dataset.d*.1));localStorage.setItem('ll-fs',v.toFixed(2));document.documentElement.style.setProperty('--fs',v.toFixed(2)+'rem')},
+  avatar:async b=>{const {data,error}=await sb.from('profiles').update({avatar_path:'preset:'+b.dataset.k}).eq('id',user.id).select('id');if(error)return fail(error);if(!data||!data.length)return toast('Não foi possível salvar o avatar.');await loadProf();toast('Avatar atualizado.');route()},
+  avdel:async b=>{if(!confirm('Remover este avatar? Quem estiver usando volta a ver a inicial do nome.'))return;
+    const a=AVCUSTOM.find(x=>x.key===b.dataset.k);if(!a)return;
+    const {error}=await sb.from('avatar_presets').delete().eq('key',a.key);if(error)return fail(error);
+    await sb.storage.from('avatars').remove([a.path]);await avRefresh();toast('Avatar removido.');route()},
+  delacc:async b=>{
+    if(isAdmin)return toast('A conta de administrador não pode ser excluída por aqui.');
+    const t=prompt('Isto apaga sua conta de forma permanente e não pode ser desfeito.\n\nPara confirmar, digite EXCLUIR:');
+    if(t===null)return;if(t.trim().toUpperCase()!=='EXCLUIR')return toast('Confirmação incorreta. Nada foi excluído.');
+    const {error}=await sb.rpc('delete_my_account');
+    if(error)return toast(/function|schema cache/i.test(error.message)?'A exclusão de conta ainda não está habilitada no servidor.':/foreign key/i.test(error.message)?'Não foi possível excluir a conta agora: há dados vinculados a ela. Fale com a administração.':error.message);
+    await actions.logout();toast('Sua conta foi excluída.')},
+  logout:async()=>{
+    try{await sb.auth.signOut({scope:'local'})}catch(e){}
+    try{Object.keys(localStorage).filter(k=>/^sb-.*-auth-token/.test(k)).forEach(k=>localStorage.removeItem(k))}catch(e){}
+    user=null;isAdmin=false;myProf=null;roleP=Promise.resolve();route.last=null;onscroll=null;
+    document.querySelectorAll('details[open]').forEach(d=>d.removeAttribute('open'));
+    header();go('/');route()},
+  proof:async b=>{const w=window.open('','_blank');const {data,error}=await sb.storage.from('payment-proofs').createSignedUrl(b.dataset.p,600);if(error||!data){if(w)w.close();return toast('Não foi possível abrir o comprovante.')}if(w)w.location=data.signedUrl;else location.href=data.signedUrl},
+  buy:async b=>{const {data,error}=await sb.rpc('create_order',{p_book_id:b.dataset.id});if(error)return fail(error);
+    const r0=Array.isArray(data)?data[0]:data;let oid=typeof r0==='string'?r0:(r0&&(r0.order_id||r0.id));
+    if(!oid){const {data:o}=await sb.from('orders').select('id').eq('user_id',user.id).eq('book_id',b.dataset.id).eq('status','pending').order('created_at',{ascending:false}).limit(1).maybeSingle();oid=o&&o.id}
+    await route();mailOrder(oid)},
+  ckgo:async b=>{CK.step=+b.dataset.s;if(CK.step===3&&!CK.order)return toast('Crie o pedido primeiro.');if(CK.step===4)CK.order=await ckLoadOrder(CK.book);ckRender()},
+  ckrefresh:async()=>{await checkout(CK.slug);if(CK.done)return;toast('Status atualizado: ainda aguardando a confirmação.')},
+  ack:async b=>{const a=JSON.parse(localStorage.getItem('ll-ack')||'[]');a.push(b.dataset.id);localStorage.setItem('ll-ack',JSON.stringify(a));route()},
+  copy:async b=>{const t=b.dataset.c;try{await navigator.clipboard.writeText(t)}catch(e){const i=document.createElement('textarea');i.value=t;document.body.appendChild(i);i.select();try{document.execCommand('copy')}catch(_){}i.remove()}toast('Código Pix copiado.')},
+  paid:async b=>{const m=b.dataset.m||'file';let path=null;const pay=CK.order?.pay;if(!pay)return toast('Pedido não encontrado.');
+    if(m==='file'){const f=document.getElementById('proof')?.files?.[0];
+      if(!f)return toast('Escolha o arquivo do comprovante.');
+      if(f.size>5*1024*1024)return toast('O arquivo deve ter até 5 MB.');
+      if(!/^(image\/|application\/pdf)/.test(f.type))return toast('Envie uma imagem ou PDF.');
+      const ext=(f.name.split('.').pop()||'bin').toLowerCase().replace(/[^a-z0-9]/g,'').slice(0,5)||'bin';
+      path=`${user.id}/${pay.id}-${Date.now()}.${ext}`;b.disabled=true;
+      const {error:ue}=await sb.storage.from('payment-proofs').upload(path,f,{contentType:f.type,upsert:false});
+      if(ue){b.disabled=false;return toast(/bucket|not found/i.test(ue.message)?'O envio de comprovante não está disponível agora. Use "Já paguei, sem comprovante".':ue.message)}}
+    const {error}=await sb.rpc('submit_payment_proof',{p_payment_id:pay.id,p_proof_path:path});if(error)return fail(error);
+    CK.order=await ckLoadOrder(CK.book);CK.step=4;ckRender();toast(m==='file'?'Comprovante enviado. Aguardando confirmação.':'Pagamento informado. Envie o comprovante quando puder.')},
+  resend:async b=>{await mailOrder(b.dataset.id)},
+  like:async b=>{const q=b.dataset.on==='1'?sb.from('post_likes').delete().eq('post_id',b.dataset.id).eq('user_id',user.id):sb.from('post_likes').insert({post_id:b.dataset.id});
+    if(!user)return go('/login');const {error}=await q;error?fail(error):route()},
+  comments:b=>loadComments(b.dataset.id),
+  edit:async b=>{const n=prompt('Editar publicação',b.dataset.b);if(!n)return;const {error}=await sb.from('posts').update({body:n}).eq('id',b.dataset.id);error?fail(error):route()},
+  del:async b=>{if(!confirm('Excluir esta publicação?'))return;const {error}=await sb.from('posts').delete().eq('id',b.dataset.id);error?fail(error):route()}
+};
+const forms={
+  chemail:async f=>{const e=f.e.value.trim();if(!e)return;if(e.toLowerCase()===String(user.email||'').toLowerCase())return toast('Esse já é o seu e-mail atual.');
+    const {error}=await sb.auth.updateUser({email:e},{emailRedirectTo:location.href.split('#')[0]});if(error)return fail(error);
+    f.reset();toast('Enviamos um link de confirmação. O e-mail só muda depois que você confirmar.')},
+  avadd:async f=>{const nm=f.nm.value.trim(),file=f.img.files[0];if(!nm||!file)return toast('Informe o nome e escolha a imagem.');
+    if(file.size>8*1024*1024)return toast('A imagem deve ter até 8 MB.');
+    const blob=await avResize(file),ext=blob.type==='image/png'?'png':'webp';
+    const key=(nm.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')||'avatar')+'-'+Date.now().toString(36).slice(-4),path=`presets/${key}.${ext}`;
+    const {error:ue}=await sb.storage.from('avatars').upload(path,blob,{contentType:blob.type,upsert:false});if(ue)return fail(ue);
+    const {error}=await sb.from('avatar_presets').insert({key,name:nm,path,sort_order:AVCUSTOM.length+1});
+    if(error){await sb.storage.from('avatars').remove([path]);return fail(error)}
+    f.reset();await avRefresh();toast('Avatar adicionado.');route()},
+  quiz:async f=>{const ans={};f.querySelectorAll('input[type=radio]:checked').forEach(x=>{ans[x.name.slice(2)]=x.value});
+    const {data,error}=await sb.rpc('submit_quiz_attempt',{p_quiz_id:f.dataset.id,p_answers:ans});if(error)return fail(error);
+    document.getElementById('qres').innerHTML=`<div class="box"><h3>Sua pontuação</h3><p>${data.score} de ${data.max_score}</p></div>`},
+  chpass:async f=>{if(f.p.value!==f.p2.value)return toast('As senhas não coincidem.');const {error}=await sb.auth.updateUser({password:f.p.value});if(error)return fail(error);f.reset();toast('Senha alterada.')},
+  grant:async f=>{const {error}=await sb.rpc('admin_grant_access',{p_user_id:f.dataset.u,p_book_id:f.bk.value,p_notes:null});if(error)return fail(error);toast('Acesso liberado.');route()},
+  book:async f=>{const reg=cents(f.pr.value),lau=cents(f.pl.value);if(reg===null||isNaN(reg)||isNaN(lau))return toast('Confira os preços.');
+    const u={title:f.t.value,...(f.elements.namedItem('g')?{genre:f.g.value.trim()||null,author:f.au.value.trim()||'Thau Luna'}:{}),description:f.d.value||null,status:f.st.value,is_purchasable:f.pc.checked,price_regular_cents:reg,price_launch_cents:lau,launch_start_at:f.ls.value?new Date(f.ls.value).toISOString():null,launch_end_at:f.le.value?new Date(f.le.value).toISOString():null};
+    const file=f.cv.files[0];if(file){const path=`${f.dataset.id}/cover-${Date.now()}`;const {error}=await sb.storage.from('book-covers').upload(path,file,{contentType:file.type});if(error)return fail(error);u.cover_path=path}
+    const {error}=await sb.from('books').update(u).eq('id',f.dataset.id);if(error)return fail(error);toast('Livro salvo.');route()},
+  pix:async f=>{const u={id:1,pix_key_type:f.kt.value||null,pix_key:f.k.value||null,receiver_name:f.rn.value||null,copy_paste_code:f.cc.value||null,instructions:f.ins.value||null,updated_by:user.id};
+    const file=f.qr.files[0];if(file){const path=`qr-${Date.now()}`;const {error}=await sb.storage.from('pix-assets').upload(path,file,{contentType:file.type});if(error)return fail(error);u.qr_code_path=path}
+    const {error}=await sb.from('pix_settings').upsert(u,{onConflict:'id'});if(error)return fail(error);toast('Pix salvo.');route()},
+  ckdados:async f=>{const n=f.n.value.trim();if(!n)return toast('Informe o nome.');
+    if(n!==(myProf?.display_name||'')){const {error}=await sb.from('profiles').update({display_name:n}).eq('id',user.id);if(error)return fail(error);await loadProf()}
+    let ready=null;try{const r=await sb.rpc('pix_ready');if(!r.error&&typeof r.data==='boolean')ready=r.data}catch(e){}
+    if(ready===false){CK.step=2;return toast('O pagamento por Pix ainda não está disponível. Tente novamente mais tarde.')}
+    const {data,error}=await sb.rpc('create_order',{p_book_id:CK.book.id});if(error)return fail(error);
+    CK.order=await ckLoadOrder(CK.book);if(!CK.order)return toast('Não foi possível abrir o pedido.');
+    const r0=Array.isArray(data)?data[0]:data;const oid=r0&&(r0.order_id||r0.id)||CK.order.id;
+    CK.pix=await ckPixFor(oid);CK.step=3;ckRender();mailOrder(oid,true)},
+  login:async f=>{const {error}=await sb.auth.signInWithPassword({email:f.e.value,password:f.p.value});if(error)return msg(error.message);const nx=sessionStorage.getItem('ll-next');sessionStorage.removeItem('ll-next');go(nx||'/')},
+  signup:async f=>{const {data,error}=await sb.auth.signUp({email:f.e.value,password:f.p.value,options:{data:{display_name:f.n.value}}});
+    if(error)return msg(error.message);data.session?go('/'):msg('Verifique seu e-mail para confirmar o cadastro.')},
+  reset:async f=>{const {error}=await sb.auth.resetPasswordForEmail(f.e.value,{redirectTo:location.href.split('#')[0]});msg(error?error.message:'Se o e-mail existir, você receberá um link.')},
+  newpass:async f=>{const {error}=await sb.auth.updateUser({password:f.p.value});error?msg(error.message):go('/minha-conta')},
+  profile:async f=>{const {data,error}=await sb.from('profiles').update({display_name:f.n.value.trim()||null}).eq('id',user.id).select('id');if(error)return fail(error);if(!data||!data.length)return toast('Não foi possível salvar.');await loadProf();toast('Nome salvo.');route()},
+  post:async f=>{const {error}=await sb.from('posts').insert({body:f.b.value,is_spoiler:f.s.checked,book_id:f.dataset.book||null});error?fail(error):route()},
+  comment:async f=>{const {error}=await sb.from('comments').insert({post_id:f.dataset.id,body:f.b.value});error?fail(error):loadComments(f.dataset.id)}
+};
+document.addEventListener('click',async e=>{const b=e.target.closest('[data-a]');if(!b||b.disabled)return;const f=actions[b.dataset.a];if(!f)return toast('Ação indisponível.');
+  b.disabled=true;b.setAttribute('aria-busy','true');try{await f(b)}catch(err){fail(err)}finally{if(b.isConnected){b.disabled=false;b.removeAttribute('aria-busy')}}});
+document.addEventListener('submit',async e=>{const f=e.target,h=forms[f.dataset.f];if(!h)return;e.preventDefault();const btn=f.querySelector('button:not([type=button])');if(btn)btn.disabled=true;
+  try{await h(new Proxy(f,{get:(t,k)=>{if(typeof k==='string'){const el=t.elements.namedItem(k);if(el)return el}const v=t[k];return typeof v==='function'?v.bind(t):v}}))}catch(err){fail(err)}finally{if(btn&&btn.isConnected)btn.disabled=false}});
+
+const LOADER='<div aria-busy="true" aria-label="Carregando"><div class="skel" style="width:45%;height:2.4rem;margin-bottom:1.2rem"></div><div class="grid">'+'<div class="skel" style="aspect-ratio:2/3;height:auto"></div>'.repeat(3)+'</div></div>';
+// ---- roteador (hash, funciona em hospedagem estática) ----
+// ---- páginas institucionais (texto fixo; contato real informado pela administração) ----
+const CONTATO='Thauluna.acessorios@gmail.com',LEGAL_UPD='3 de outubro de 2026';
+function legal(k){
+  const mail=`<a href="mailto:${CONTATO}">${CONTATO}</a>`;
+  const P={
+  p:['Política de Privacidade',`<p>A Luna's Library é uma plataforma de leitura e venda de livros da autora Thau Luna. Esta página explica quais dados usamos e por quê. Para qualquer solicitação sobre privacidade, escreva para ${mail}.</p>
+<h2>Dados que a plataforma guarda</h2><ul><li><strong>Conta:</strong> e-mail, nome de exibição, avatar escolhido e preferência de tema. A senha é tratada pelo serviço de autenticação e não fica visível para a administração.</li><li><strong>Leitura:</strong> o progresso de leitura dos livros a que você tem acesso.</li><li><strong>Pedidos e pagamentos:</strong> livro, valor, número e status do pedido, o comprovante de Pix que você enviar e, se houver, o motivo da recusa.</li><li><strong>Comunidade:</strong> publicações, comentários e curtidas. Seu nome de exibição, seu avatar e o que você publica ficam visíveis para outros leitores.</li><li><strong>Quizzes:</strong> as respostas enviadas e a pontuação.</li></ul>
+<h2>Para que usamos</h2><p>Para criar e manter sua conta, liberar o acesso aos livros, conferir pagamentos, enviar por e-mail as instruções do pedido, guardar seu progresso e permitir sua participação na comunidade e nos quizzes. Não vendemos seus dados.</p>
+<h2>Pagamentos</h2><p>O pagamento é feito por Pix, fora do site, pelo aplicativo do seu banco. A plataforma não recebe nem guarda dados de cartão e não acessa sua conta bancária. O comprovante que você envia é usado apenas para conferir o pagamento.</p>
+<h2>Serviços que fazem a plataforma funcionar</h2><p>Usamos o Supabase (banco de dados, autenticação e armazenamento de arquivos), um serviço de envio de e-mail para as instruções de pedido, o jsDelivr (biblioteca do site) e o Google Fonts (fontes). Seu navegador também guarda a sessão e o tema no próprio aparelho.</p>
+<h2>Segurança</h2><p>Usamos regras de acesso no banco de dados para limitar quem pode ver cada informação e exigimos login para áreas pessoais. Nenhum sistema é totalmente livre de riscos, por isso mantenha sua senha em segurança.</p>
+<h2>Seus direitos</h2><p>Nos termos da Lei Geral de Proteção de Dados (LGPD), você pode pedir confirmação do tratamento, acesso, correção e eliminação dos seus dados. Você pode alterar seu nome e avatar em Configurações e excluir a conta em Configurações → Conta. Para outros pedidos, escreva para ${mail}.</p>
+<h2>Alterações</h2><p>Esta política pode ser atualizada. A data da última revisão aparece no topo da página.</p>`],
+  t:['Termos de Uso',`<p>Ao usar a Luna's Library você concorda com estes termos. Dúvidas: ${mail}.</p>
+<h2>A plataforma</h2><p>A Luna's Library reúne livros, universos, quizzes e uma comunidade de leitores. Alguns conteúdos são gratuitos (como capítulos de prévia) e outros são pagos.</p>
+<h2>Sua conta</h2><p>Para comprar, ler conteúdo pago, usar a estante ou participar da comunidade, é preciso criar uma conta. Você é responsável por informar dados verdadeiros, manter sua senha em segurança e por tudo o que for feito na sua conta. O acesso é pessoal e não deve ser compartilhado.</p>
+<h2>Acesso aos livros</h2><p>Capítulos gratuitos podem ser lidos conforme indicado em cada livro. Os capítulos pagos são liberados na sua conta somente depois da confirmação do pagamento. A leitura é feita online, dentro da plataforma.</p>
+<h2>Propriedade intelectual</h2><p>Os livros, textos, personagens, capas e demais conteúdos são criações de Thau Luna e protegidos por direitos autorais. Não é permitido copiar, reproduzir, distribuir, publicar ou revender os conteúdos sem autorização por escrito.</p>
+<h2>Regras de uso</h2><ul><li>Não compartilhe sua conta nem tente acessar conteúdo pago sem pagamento confirmado.</li><li>Não explore falhas nem tente prejudicar o funcionamento da plataforma.</li><li>Na comunidade, trate as pessoas com respeito. Conteúdo ofensivo, ilegal ou que viole direitos de terceiros não é permitido. Quando houver a opção, marque publicações com spoiler.</li></ul>
+<h2>Alterações</h2><p>A plataforma e estes termos podem ser atualizados. A data da última revisão aparece no topo da página.</p>`],
+  c:['Política de Compra e Cancelamento',`<p>Veja como funciona a compra de um livro na Luna's Library. Dúvidas: ${mail}.</p>
+<h2>Como comprar</h2><ul><li>Entre na sua conta e escolha o livro. O pedido recebe um número.</li><li>Você recebe as instruções de pagamento por Pix na plataforma e por e-mail.</li><li>O pagamento é feito por você, pelo seu banco, e é conferido manualmente.</li><li>Depois de pagar, envie o comprovante pela própria plataforma.</li></ul>
+<h2>Análise do pagamento</h2><p>A administração confere o comprovante manualmente. O pagamento pode ser <strong>confirmado</strong> ou <strong>recusado</strong>. Se for recusado, o motivo é informado e você pode fazer um novo pedido.</p>
+<h2>Liberação do livro</h2><p>O livro só é liberado depois que o pagamento é confirmado. Enquanto isso, os capítulos pagos continuam bloqueados e a prévia gratuita continua disponível.</p>
+<h2>Cancelamento e reembolso</h2><p>Solicitações de cancelamento ou reembolso devem ser feitas por contato em até 3 dias úteis a partir da compra, pelo e-mail ${mail}. Não há outras condições definidas além desta.</p>`]};
+  const [t,h]=P[k];
+  app.innerHTML=`<article class="legal"><h1>${t}</h1><p class="upd">Última atualização: ${LEGAL_UPD}</p>${h}<p class="row lnav"><a class="btn alt sm" href="#/configuracoes">← Configurações</a><a class="btn alt sm" href="#/privacidade">Privacidade</a><a class="btn alt sm" href="#/termos">Termos de Uso</a><a class="btn alt sm" href="#/compra">Compra e Cancelamento</a></p></article>`;
+}
+const TRLANGS=[['en','English'],['es','Español']];
+async function adminTraducoes(){
+  if(!await guard())return;
+  const {data:bk,error}=await sb.from('books').select('id,slug,title').order('title');if(error)throw error;
+  app.innerHTML=`<h1>Traduções</h1><p class="mute">O texto original em português (PT-BR) não é editado aqui. Escolha um livro e um capítulo para cadastrar ou revisar as traduções em inglês e espanhol.</p>
+  <div class="box wide"><label>Livro<select id="tr-book"><option value="">Selecione um livro</option>${bk.map(b=>`<option value="${esc(b.id)}">${esc(b.title)}</option>`).join('')}</select></label>
+  <label>Capítulo<select id="tr-chap" disabled><option value="">Selecione o livro primeiro</option></select></label></div>
+  <div id="tr-area"></div>`;
+  const bookSel=document.getElementById('tr-book'),chapSel=document.getElementById('tr-chap'),area=document.getElementById('tr-area');
+  bookSel.onchange=async()=>{
+    area.innerHTML='';chapSel.disabled=true;const bid=bookSel.value;
+    if(!bid){chapSel.innerHTML='<option value="">Selecione o livro primeiro</option>';return}
+    chapSel.innerHTML='<option value="">Carregando…</option>';
+    const {data:ch,error}=await sb.from('chapters').select('id,position,title').eq('book_id',bid).order('position');
+    if(error){chapSel.innerHTML='<option value="">Não foi possível carregar os capítulos</option>';return}
+    chapSel.innerHTML='<option value="">Selecione um capítulo</option>'+ch.map(c=>`<option value="${esc(c.id)}">${c.position}. ${esc(c.title||'(sem título)')}</option>`).join('');
+    chapSel.disabled=false};
+  chapSel.onchange=()=>loadTrChapter(chapSel.value);
+}
+async function loadTrChapter(chapId){
+  const area=document.getElementById('tr-area');
+  if(!chapId){area.innerHTML='';return}
+  area.innerHTML=LOADER;
+  const [{data:ch},{data:orig},{data:trs,error}]=await Promise.all([
+    sb.from('chapters').select('title').eq('id',chapId).maybeSingle(),
+    sb.from('chapter_contents').select('body').eq('chapter_id',chapId).maybeSingle(),
+    sb.from('chapter_translations').select('id,language,title,body').eq('chapter_id',chapId)]);
+  if(error){area.innerHTML=state('Não foi possível carregar as traduções deste capítulo.',1);return}
+  const trMap=new Map((trs||[]).map(t=>[t.language,t]));
+  const langBox=([code,label])=>{const t=trMap.get(code);return `<div class="box wide"><h3>${esc(label)}</h3><form data-tr="${code}"><label>Título<input name="ti" maxlength="200" required value="${esc(t?.title||'')}"></label><label>Conteúdo<textarea name="bo" rows="10" required>${esc(t?.body||'')}</textarea></label><div class="row"><button type="submit">${t?'Salvar alterações':'Salvar tradução'}</button>${t?`<button type="button" class="alt" data-deltr="${code}">Excluir tradução</button>`:''}</div></form></div>`};
+  area.innerHTML=`<div class="box wide"><h3>Original (PT-BR) — somente leitura</h3><p class="mute">${esc(ch?.title||'')}</p><div class="read" style="max-height:260px;overflow:auto">${orig?renderBody(orig.body):state('Este capítulo ainda não tem texto original.')}</div></div>
+  ${TRLANGS.map(langBox).join('')}`;
+  area.querySelectorAll('form[data-tr]').forEach(f=>f.onsubmit=async e=>{
+    e.preventDefault();const lang=f.dataset.tr;
+    const {error}=await sb.from('chapter_translations').upsert({chapter_id:chapId,language:lang,title:f.ti.value,body:f.bo.value},{onConflict:'chapter_id,language'});
+    if(error)return fail(error);toast('Tradução salva.');loadTrChapter(chapId)});
+  area.querySelectorAll('[data-deltr]').forEach(b=>b.onclick=async()=>{
+    if(!confirm('Excluir esta tradução? O texto original em português não é afetado.'))return;
+    const {error}=await sb.from('chapter_translations').delete().eq('chapter_id',chapId).eq('language',b.dataset.deltr);
+    if(error)return fail(error);toast('Tradução excluída.');loadTrChapter(chapId)});
+}
+async function adminLivroCaps(slug){
+  if(!await guard())return;
+  const {data:b,error}=await sb.from('books').select('id,slug,title,status').eq('slug',slug).maybeSingle();if(error)throw error;
+  if(!b){app.innerHTML=state('Livro não encontrado.');return}
+  const {data:ch,error:e2}=await sb.from('chapters').select('id,position,title,is_published,is_free_preview').eq('book_id',b.id).order('position');if(e2)throw e2;
+  const ids=ch.map(x=>x.id),{data:ct,error:e3}=ids.length?await sb.from('chapter_contents').select('chapter_id').in('chapter_id',ids):{data:[]};if(e3)throw e3;
+  const has=new Set((ct||[]).map(x=>x.chapter_id)),pos=ch.map(x=>x.position),max=Math.max(0,...pos),miss=[];
+  for(let i=1;i<=max;i++)if(!pos.includes(i))miss.push(i);
+  const dup=[...new Set(pos.filter((p,i)=>pos.indexOf(p)!==i))],nt=ch.filter(x=>!has.has(x.id)).length,nti=ch.filter(x=>!String(x.title||'').trim()).length;
+  const ok=ch.length&&!miss.length&&!dup.length&&!nt&&!nti;
+  app.innerHTML=`<p><a href="#/admin/livros">← Livros</a></p><h1>${esc(b.title)}</h1><p class="mute">Status do livro: ${esc(b.status)} · Revisão somente leitura: nada aqui altera textos ou ordem.</p>
+  <div class="box"><strong>${ch.length} capítulos</strong> · ${ch.filter(x=>x.is_published).length} publicados · ${ch.filter(x=>!x.is_published).length} rascunho · ${ch.filter(x=>x.is_free_preview).length} prévia gratuita<p>${miss.length?`<span class="tag">Números faltando: ${miss.join(', ')}</span> `:''}${dup.length?`<span class="tag">Posições repetidas: ${dup.join(', ')}</span> `:''}${nt?`<span class="tag">Sem texto: ${nt}</span> `:''}${nti?`<span class="tag">Sem título: ${nti}</span> `:''}${ok?'<span class="tag">Sequência completa, com título e texto em todos</span>':''}</p></div>
+  ${ch.length?ch.map(x=>`<div class="box"><div class="row"><b>${x.position}</b> <strong>${esc(x.title||'(sem título)')}</strong></div><p class="mute">${x.is_published?'Publicado':'Rascunho'}${x.is_free_preview?' · Prévia gratuita':''} · ${has.has(x.id)?'Com texto':'<strong>Sem texto</strong>'}</p><p class="row"><a class="btn alt sm" href="#/ler/${esc(b.slug)}/${x.position}">Ler no site</a><button class="alt sm" data-a="chtext" data-id="${x.id}">Ver texto aqui</button></p><div id="ct-${x.id}"></div></div>`).join(''):state('Este livro ainda não tem capítulos.')}`;
+}
+
+const routes=[[/^\/privacidade$/,()=>legal('p')],[/^\/termos$/,()=>legal('t')],[/^\/compra$/,()=>legal('c')],[/^\/admin\/livros\/([^/]+)$/,adminLivroCaps,1],[/^\/$/,home],[/^\/catalogo$/,catalogo],[/^\/livro\/([^/]+)$/,livro],[/^\/login$/,login],[/^\/cadastro$/,cadastro],[/^\/recuperar$/,recuperar],[/^\/minha-conta$/,conta,1],[/^\/minha-estante$/,estante,1],[/^\/quiz\/([^/]+)$/,quiz],[/^\/universos$/,universos],[/^\/universos\/([^/]+)$/,universo],[/^\/quizzes$/,quizzes],[/^\/ler\/([^/]+)\/(\d+)$/,ler],[/^\/admin$/,admin,1],[/^\/admin\/livros$/,adminLivros,1],[/^\/admin\/pedidos$/,adminPedidos,1],[/^\/admin\/usuarios$/,adminUsuarios,1],[/^\/admin\/configuracoes$/,adminPix,1],[/^\/admin\/importar$/,adminImportar,1],[/^\/admin\/traducoes$/,adminTraducoes,1],[/^\/admin\/avatares$/,adminAvatares,1],[/^\/checkout\/([^/]+)$/,checkout],[/^\/configuracoes$/,configuracoes],[/^\/configuracoes\/conta$/,editarConta,1]];
+async function route(){
+  header();onscroll=null;const path=(location.hash.slice(1)||'/').split('?')[0];
+  const raw=location.hash.slice(1);
+  if(/^(access_token|error)=/.test(raw)){
+    const hp=new URLSearchParams(raw);
+    if(hp.get('error')||hp.get('error_code')){app.innerHTML='<h1>Link inválido ou expirado</h1>'+state('Este link de confirmação já foi usado ou expirou. Se você já confirmou o e-mail, basta entrar com e-mail e senha.')+'<p class="row"><a class="btn" href="#/login">Entrar</a><a class="btn alt" href="#/recuperar">Esqueci a senha</a></p>';return}
+    app.innerHTML=LOADER;return}
+  if(path!==route.last){scrollTo(0,0);route.last=path}
+  for(const [re,fn,needAuth] of routes){const m=path.match(re);if(!m)continue;
+    if(needAuth&&!user)return go('/login');
+    app.innerHTML=LOADER;
+    try{await avP;await fn(...m.slice(1))}catch(e){app.innerHTML=state('Não foi possível carregar os dados: '+esc(e.message||e),1)}
+    return}
+  app.innerHTML=state('Página não encontrada.');
+}
+addEventListener('hashchange',route);
+sb.auth.onAuthStateChange((ev,s)=>{const id=s?.user?.id;if(ev==='PASSWORD_RECOVERY'){user=s.user;header();return novaSenha()}
+  if(ev==='INITIAL_SESSION'||id!==user?.id){user=s?.user||null;isAdmin=false;const uid=user?.id;roleP=uid?sb.from('user_roles').select('role').eq('user_id',uid).eq('role','admin').maybeSingle().then(({data})=>{if(user?.id===uid){isAdmin=!!data;header()}},()=>{}):Promise.resolve();loadProf();const th=user?.user_metadata?.theme;if(['light','dark','sepia'].includes(th))applyTheme(th);route()}});
