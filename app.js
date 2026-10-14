@@ -1,6 +1,7 @@
 // Somente chave PÚBLICA (publishable). Nunca coloque service_role aqui.
 const SB_URL='https://eulrdtkuxafhrygsbyuh.supabase.co', SB_KEY='sb_publishable_Vp3ulHnGeIPXfcT2P5y71A_olQSr9wp';
 const sb=supabase.createClient(SB_URL,SB_KEY,{auth:{lock:async(n,t,fn)=>await fn()}});
+let cartIds=[],cartP=Promise.resolve();
 const app=document.getElementById('app');
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const brl=c=>(c/100).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
@@ -96,6 +97,7 @@ async function livro(slug){
     :`<div class="box"><span class="tag">🟡 Aguardando pagamento</span> <span class="mute">Pedido ${ordN(order.order_number)}</span><p><strong>Pedido criado.</strong> Enviamos as instruções de pagamento para o seu e-mail. O livro continua bloqueado até a administração confirmar o pagamento.</p><p class="mute">Valor: ${brl(order.amount_cents)}</p><p class="row"><a class="btn" href="#/checkout/${esc(b.slug)}">Ver pagamento e enviar comprovante</a><button class="alt sm" data-a="resend" data-id="${order.id}">Reenviar instruções por e-mail</button></p></div>`;
   else if(b.is_purchasable)action=user?`${topPay(last?.payments)==='rejected'?`<p class="state bad">${PS.rejected}: seu último pagamento não foi aceito. O livro continua bloqueado. Você pode fazer um novo pedido.</p>`:''}<a class="btn big" href="#/checkout/${esc(b.slug)}">Comprar livro por ${brl(b.effective_price_cents)}</a>`:`<a class="btn big" href="#/checkout/${esc(b.slug)}">Comprar livro por ${brl(b.effective_price_cents)}</a>`;
   else action='<button class="big" disabled>Compra ainda não disponível</button>';
+  if(!owned&&!isAdmin&&!order&&b.is_purchasable&&b.status==='published'){await cartP;action+=cartIds.includes(b.id)?`<p class="row"><a class="btn alt" href="#/carrinho">No carrinho · Ver carrinho</a><button class="alt sm" data-a="cartrm" data-id="${esc(b.id)}">Remover</button></p>`:`<button class="alt" data-a="cartadd" data-id="${esc(b.id)}">Adicionar ao carrinho</button>`}
   const pb=await paidBanner();
   app.innerHTML=`${pb}<div class="bookhead"><div class="cover">${coverHtml(b)}</div><div><h1>${esc(b.title)}</h1>${by(b)}<div>${gtag(b)}${badges(b)}</div>${b.description?`<p class="eyebrow" style="margin-top:1.4rem">Sinopse</p><p class="desc syn" id="syn">${esc(b.description)}</p><button type="button" class="more" id="synb" hidden>Ler mais</button>`:''}<p class="price big">${priceHtml(b)}</p><div class="act">${action}</div></div></div>
   <h2 style="margin-top:2.4rem">Sumário</h2>${ch.length?`<div class="chaps">${ch.map(x=>x.is_free_preview||canRead?`<a class="chap" href="#/ler/${esc(b.slug)}/${x.position}"><b>${x.position}</b><span>${esc(x.title)}</span>${!canRead?'<em class="st free">Prévia gratuita</em>':''}</a>`:`<a class="chap locked" href="#/checkout/${esc(b.slug)}"><b>${x.position}</b><span>${esc(x.title)}</span><em class="st">${LOCK}Disponível após a compra</em></a>`).join('')}</div>${isAdmin?'<p class="mute">Você está com a conta administradora, por isso todos os capítulos ficam liberados para você. Para ver o bloqueio, saia e entre com uma conta comum.</p>':''}${!canRead&&ch.some(x=>!x.is_free_preview)?'<p class="mute">A prévia gratuita está liberada. Os demais capítulos ficam bloqueados até a confirmação do pagamento.</p>':''}`:state('A leitura deste livro ainda não está disponível.')}`;
@@ -371,6 +373,7 @@ function header(){
   document.getElementById('tabs').innerHTML=T.map(([p,t,i])=>`<a href="#${p}"${on(p)?' class="on" aria-current="page"':''}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="${IC[i]}"/></svg>${t}</a>`).join('');
   document.body.classList.toggle('is-adm',adm);
   const gr=document.getElementById('gear');gr.classList.toggle('on',cur.startsWith('/configuracoes'));if(cur.startsWith('/configuracoes'))gr.setAttribute('aria-current','page');else gr.removeAttribute('aria-current');
+  cartBadge();
 }
 async function home(){
   const [bk,{data:un},{data:ps},{data:pg}]=await Promise.all([books(),sb.from('universes').select('slug,name,description').order('sort_order'),sb.from('posts').select('body,created_at,is_spoiler,profiles(display_name,avatar_path)').order('created_at',{ascending:false}).limit(3),user?sb.from('reading_progress').select('book_id,progress_percent').eq('user_id',user.id).order('last_read_at',{ascending:false}).limit(1).maybeSingle():Promise.resolve({data:null})]);
@@ -571,6 +574,8 @@ const actions={
     st.textContent=`Concluído: ${L.length} capítulos importados.`;toast('Importação concluída.')},
   resetmail:async()=>{const {error}=await sb.auth.resetPasswordForEmail(user.email,{redirectTo:location.href.split('#')[0]});toast(error?error.message:'Enviamos um link para o seu e-mail.')},
   confirm:async b=>{if(!confirm('Confirmar este pagamento e liberar o acesso ao livro?'))return;const {error}=await sb.rpc('admin_confirm_payment',{p_payment_id:b.dataset.id});if(error)return fail(error);toast('Pagamento confirmado.');route()},
+  cartadd:async b=>{await cartAdd(b.dataset.id);toast('Livro adicionado ao carrinho.');route()},
+  cartrm:async b=>{await cartRemove(b.dataset.id);toast('Livro removido do carrinho.');route()},
   cancelorder:async b=>{if(!confirm('Cancelar este pedido? Ele deixará de aparecer na lista e o livro não será liberado.'))return;const {error}=await sb.rpc('admin_cancel_pending_order',{p_payment_id:b.dataset.id});if(error)return fail(error);toast('Pedido cancelado.');route()},
   reject:async b=>{const r=prompt('Motivo da recusa (opcional):');if(r===null)return;const {error}=await sb.rpc('admin_reject_payment',{p_payment_id:b.dataset.id,p_reason:r||null});if(error)return fail(error);toast('Pagamento recusado.');route()},
   revoke:async b=>{if(!confirm('Revogar o acesso deste usuário ao livro?'))return;const {error}=await sb.rpc('admin_revoke_access',{p_user_id:b.dataset.u,p_book_id:b.dataset.b});if(error)return fail(error);toast('Acesso revogado.');route()},
@@ -831,7 +836,81 @@ async function adminLivroCaps(slug){
   ${ch.length?ch.map(x=>`<div class="box"><div class="row"><b>${x.position}</b> <strong>${esc(x.title||'(sem título)')}</strong></div><p class="mute">${x.is_published?'Publicado':'Rascunho'}${x.is_free_preview?' · Prévia gratuita':''} · ${has.has(x.id)?'Com texto':'<strong>Sem texto</strong>'}</p><p class="row"><a class="btn alt sm" href="#/ler/${esc(b.slug)}/${x.position}">Ler no site</a><button class="alt sm" data-a="chtext" data-id="${x.id}">Ver texto aqui</button></p><div id="ct-${x.id}"></div></div>`).join(''):state('Este livro ainda não tem capítulos.')}`;
 }
 
-const routes=[[/^\/politicas$/,legalHub],[/^\/(privacidade|termos|compra|politica-da-comunidade|politica-de-spoilers|direitos-autorais|politica-de-traducoes|politica-de-quizzes|cookies)$/,legalSlug],[/^\/admin\/livros\/([^/]+)$/,adminLivroCaps,1],[/^\/$/,home],[/^\/catalogo$/,catalogo],[/^\/livro\/([^/]+)$/,livro],[/^\/login$/,login],[/^\/cadastro$/,cadastro],[/^\/recuperar$/,recuperar],[/^\/minha-conta$/,conta,1],[/^\/minha-estante$/,estante,1],[/^\/quiz\/([^/]+)$/,quiz],[/^\/universos$/,universos],[/^\/universos\/([^/]+)$/,universo],[/^\/quizzes$/,quizzes],[/^\/ler\/([^/]+)\/(\d+)$/,ler],[/^\/admin$/,admin,1],[/^\/admin\/livros$/,adminLivros,1],[/^\/admin\/pedidos$/,adminPedidos,1],[/^\/admin\/usuarios$/,adminUsuarios,1],[/^\/admin\/configuracoes$/,adminPix,1],[/^\/admin\/importar$/,adminImportar,1],[/^\/admin\/traducoes$/,adminTraducoes,1],[/^\/admin\/avatares$/,adminAvatares,1],[/^\/checkout\/([^/]+)$/,checkout],[/^\/configuracoes$/,configuracoes],[/^\/configuracoes\/conta$/,editarConta,1]];
+// ======================= v9: carrinho =======================
+const CART_KEY='ll-cart',CART_MAX=50,UUID_RE=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const CART_IC='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h2.2l2 11.2a1.6 1.6 0 0 0 1.6 1.3h8.1a1.6 1.6 0 0 0 1.6-1.2L20 8H6.1"/><circle cx="9.5" cy="20" r="1.3"/><circle cx="17" cy="20" r="1.3"/></svg>';
+const cartLocal=()=>{try{const a=JSON.parse(localStorage.getItem(CART_KEY)||'[]');return Array.isArray(a)?[...new Set(a.filter(x=>typeof x==='string'&&UUID_RE.test(x)))].slice(0,CART_MAX):[]}catch(e){return[]}};
+const cartLocalSet=a=>{try{localStorage.setItem(CART_KEY,JSON.stringify(a))}catch(e){}};
+// Visitante: guarda no aparelho (localStorage). Logado: guarda na tabela cart_items (RLS: só o dono vê/grava).
+// Ao entrar, o carrinho do aparelho é somado ao da conta. Livros que a pessoa já possui saem sozinhos.
+async function loadCart(){
+  try{
+    if(!user){cartIds=cartLocal();return}
+    const loc=cartLocal();
+    let ids=((await sb.from('cart_items').select('book_id').eq('user_id',user.id)).data||[]).map(x=>x.book_id);
+    for(const id of loc){if(ids.includes(id)||ids.length>=CART_MAX)continue;
+      const {error}=await sb.from('cart_items').insert({user_id:user.id,book_id:id});if(!error||error.code==='23505')ids.push(id)}
+    if(loc.length)cartLocalSet([]);
+    if(ids.length){
+      const own=(await sb.from('book_entitlements').select('book_id').eq('user_id',user.id).eq('status','active').in('book_id',ids)).data||[];
+      for(const o of own)await sb.from('cart_items').delete().eq('user_id',user.id).eq('book_id',o.book_id);
+      ids=ids.filter(id=>!own.some(o=>o.book_id===id))}
+    cartIds=[...new Set(ids)];
+  }catch(e){cartIds=user?cartIds:cartLocal()}finally{cartBadge()}
+}
+async function cartAdd(id){
+  if(!UUID_RE.test(id)||cartIds.includes(id))return;
+  if(cartIds.length>=CART_MAX)throw new Error('Seu carrinho está cheio (máximo de '+CART_MAX+' livros).');
+  if(user){const {error}=await sb.from('cart_items').insert({user_id:user.id,book_id:id});if(error&&error.code!=='23505')throw error}
+  else cartLocalSet([...cartLocal(),id]);
+  cartIds=[...cartIds,id];cartBadge();
+}
+async function cartRemove(id){
+  if(user){const {error}=await sb.from('cart_items').delete().eq('user_id',user.id).eq('book_id',id);if(error)throw error}
+  else cartLocalSet(cartLocal().filter(x=>x!==id));
+  cartIds=cartIds.filter(x=>x!==id);cartBadge();
+}
+function cartBadge(){
+  const tools=document.querySelector('.tools');if(!tools)return;
+  let a=document.getElementById('cartlink');
+  if(!a){a=document.createElement('a');a.id='cartlink';a.className='cartlink';a.href='#/carrinho';a.title='Carrinho';a.innerHTML=CART_IC+'<span class="cbadge" hidden></span>';tools.insertBefore(a,tools.firstChild)}
+  const n=cartIds.length,bd=a.querySelector('.cbadge');
+  bd.textContent=n>99?'99+':String(n);bd.hidden=!n;
+  a.setAttribute('aria-label',n?`Carrinho, ${n} ${n===1?'item':'itens'}`:'Carrinho');
+  a.classList.toggle('on',(location.hash.slice(1)||'/').startsWith('/carrinho'));
+  a.hidden=!!isAdmin;
+}
+// Resumo pronto para checkout, cupons e Pix: o desconto entra aqui no futuro. O servidor sempre recalcula o preço ao criar o pedido.
+const cartSummary=items=>{const pay=items.filter(i=>!i.pend),subtotal=pay.reduce((t,i)=>t+i.b.effective_price_cents,0),discount=0;return{count:pay.length,pay,subtotal,discount,total:subtotal-discount}};
+async function carrinho(){
+  await roleP;await cartP;
+  if(isAdmin){app.innerHTML='<div class="ck"><h1>Carrinho</h1><p class="state">Conta administrativa: você tem acesso total aos livros e não precisa comprar.</p></div>';return}
+  const notes=[],items=[],gone=[];
+  if(cartIds.length){
+    const ids=cartIds.slice();
+    const [bkR,own,pen]=await Promise.all([
+      sb.from('book_catalog').select('*').in('id',ids),
+      user?sb.from('book_entitlements').select('book_id').eq('user_id',user.id).eq('status','active').in('book_id',ids):Promise.resolve({data:[]}),
+      user?sb.from('orders').select('book_id,order_number').eq('user_id',user.id).eq('status','pending').in('book_id',ids):Promise.resolve({data:[]})]);
+    if(bkR.error)throw bkR.error;
+    const owned=new Set((own.data||[]).map(x=>x.book_id)),pend=new Map((pen.data||[]).map(x=>[x.book_id,x.order_number])),byId=new Map((bkR.data||[]).map(b=>[b.id,b]));
+    for(const id of ids){const b=byId.get(id);
+      if(owned.has(id)){gone.push(id);notes.push(`Você já tem “${b?b.title:'este livro'}” na sua estante, então ele saiu do carrinho.`);continue}
+      if(!b||b.status!=='published'||!b.is_purchasable){gone.push(id);notes.push(`${b?`“${b.title}”`:'Um livro'} não está disponível para compra no momento e saiu do carrinho.`);continue}
+      items.push({b,pend:pend.get(id)})}
+    for(const id of gone){try{await cartRemove(id)}catch(e){}}
+  }
+  const nt=notes.map(n=>`<p class="state">${esc(n)}</p>`).join('');
+  if(!items.length){app.innerHTML=`<div class="cart"><h1>Carrinho</h1>${nt}${state('Seu carrinho está vazio.')}<p class="row" style="justify-content:center;margin-top:1rem"><a class="btn" href="#/catalogo">Ver o catálogo</a></p></div>`;return}
+  const S=cartSummary(items),n=items.length;
+  const rows=items.map(({b,pend})=>`<li class="cart-it"><a class="cart-cv" href="#/livro/${esc(b.slug)}" aria-label="${esc(b.title)}"><div class="cover">${coverHtml(b)}</div></a><div class="cart-info"><a class="cart-t" href="#/livro/${esc(b.slug)}">${esc(b.title)}</a>${by(b)}<div class="cart-p">${priceHtml(b)}</div>${pend?`<div><span class="tag">Pedido ${ordN(pend)} aguardando pagamento</span></div>`:''}</div><div class="cart-act">${pend?`<a class="btn alt sm" href="#/checkout/${esc(b.slug)}">Ver pagamento</a>`:`<a class="btn sm" href="#/checkout/${esc(b.slug)}">Comprar este livro</a>`}<button class="alt sm" data-a="cartrm" data-id="${esc(b.id)}">Remover</button></div></li>`).join('');
+  let cta='';
+  if(S.count===1)cta=`<a class="btn big" href="#/checkout/${esc(S.pay[0].b.slug)}">Finalizar compra</a>`;
+  else if(S.count>1)cta='<p class="mute">Cada livro tem o seu próprio pedido e o seu próprio Pix. Escolha por qual começar em “Comprar este livro”.</p>';
+  app.innerHTML=`<div class="cart"><h1>Carrinho</h1><p class="mute">${n} ${n===1?'livro':'livros'}</p>${nt}<div class="cart-grid"><ul class="cart-list">${rows}</ul><aside class="box cart-sum" aria-label="Resumo do carrinho"><h2>Resumo</h2><dl><div><dt>Livros a pagar</dt><dd>${S.count}</dd></div><div><dt>Subtotal</dt><dd>${brl(S.subtotal)}</dd></div>${S.discount?`<div><dt>Desconto</dt><dd>−${brl(S.discount)}</dd></div>`:''}<div class="tot"><dt>Total</dt><dd>${brl(S.total)}</dd></div></dl>${cta}${user?'':'<p class="mute"><small>Seu carrinho fica salvo neste aparelho. Ao entrar na sua conta, ele passa para ela.</small></p>'}<p class="mute"><small>O valor final é confirmado quando o pedido é criado. O livro só é liberado depois que a administração confirmar o pagamento.</small></p></aside></div></div>`;
+}
+
+const routes=[[/^\/politicas$/,legalHub],[/^\/(privacidade|termos|compra|politica-da-comunidade|politica-de-spoilers|direitos-autorais|politica-de-traducoes|politica-de-quizzes|cookies)$/,legalSlug],[/^\/admin\/livros\/([^/]+)$/,adminLivroCaps,1],[/^\/$/,home],[/^\/catalogo$/,catalogo],[/^\/livro\/([^/]+)$/,livro],[/^\/login$/,login],[/^\/cadastro$/,cadastro],[/^\/recuperar$/,recuperar],[/^\/minha-conta$/,conta,1],[/^\/minha-estante$/,estante,1],[/^\/quiz\/([^/]+)$/,quiz],[/^\/universos$/,universos],[/^\/universos\/([^/]+)$/,universo],[/^\/quizzes$/,quizzes],[/^\/ler\/([^/]+)\/(\d+)$/,ler],[/^\/admin$/,admin,1],[/^\/admin\/livros$/,adminLivros,1],[/^\/admin\/pedidos$/,adminPedidos,1],[/^\/admin\/usuarios$/,adminUsuarios,1],[/^\/admin\/configuracoes$/,adminPix,1],[/^\/admin\/importar$/,adminImportar,1],[/^\/admin\/traducoes$/,adminTraducoes,1],[/^\/admin\/avatares$/,adminAvatares,1],[/^\/checkout\/([^/]+)$/,checkout],[/^\/carrinho$/,carrinho],[/^\/configuracoes$/,configuracoes],[/^\/configuracoes\/conta$/,editarConta,1]];
 async function route(){
   header();onscroll=null;const path=(location.hash.slice(1)||'/').split('?')[0];
   const raw=location.hash.slice(1);
@@ -849,5 +928,5 @@ async function route(){
 }
 addEventListener('hashchange',route);
 sb.auth.onAuthStateChange((ev,s)=>{const id=s?.user?.id;if(ev==='PASSWORD_RECOVERY'){user=s.user;header();return novaSenha()}
-  if(ev==='INITIAL_SESSION'||id!==user?.id){user=s?.user||null;isAdmin=false;const uid=user?.id;roleP=uid?sb.from('user_roles').select('role').eq('user_id',uid).eq('role','admin').maybeSingle().then(({data})=>{if(user?.id===uid){isAdmin=!!data;header()}},()=>{}):Promise.resolve();loadProf();const th=user?.user_metadata?.theme;if(['light','dark','sepia'].includes(th))applyTheme(th);route()}});
+  if(ev==='INITIAL_SESSION'||id!==user?.id){user=s?.user||null;isAdmin=false;const uid=user?.id;roleP=uid?sb.from('user_roles').select('role').eq('user_id',uid).eq('role','admin').maybeSingle().then(({data})=>{if(user?.id===uid){isAdmin=!!data;header()}},()=>{}):Promise.resolve();loadProf();const th=user?.user_metadata?.theme;if(['light','dark','sepia'].includes(th))applyTheme(th);cartP=loadCart();route()}});
 setTimeout(()=>{if(!app.innerHTML.trim())route()},3000);
