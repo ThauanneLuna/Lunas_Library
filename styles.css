@@ -352,3 +352,15 @@ button.qopt[aria-checked=true]{border-color:var(--acc);background:var(--soft);co
 .cart-sum .btn.big{width:100%}
 @media(min-width:520px){.cart-it{grid-template-columns:84px 1fr auto}.cart-act{grid-column:auto;flex-direction:column;align-items:stretch}}
 @media(min-width:820px){.cart-grid{grid-template-columns:1fr 330px;align-items:start}.cart-sum{position:sticky;top:5rem}}
+
+/* sobre a autora */
+.about{display:grid;gap:1.8rem;max-width:980px;margin:0 auto;align-items:start}
+@media(min-width:780px){.about{grid-template-columns:minmax(260px,360px) 1fr;gap:3rem}.about-f{position:sticky;top:5rem}}
+.about-f{margin:0;justify-self:center;width:min(100%,360px);position:relative}
+.about-f::before{content:"";position:absolute;inset:12px -12px -12px 12px;border-radius:26px;background:var(--soft);z-index:0}
+.about-f img{position:relative;z-index:1;display:block;width:100%;height:auto;aspect-ratio:4/5;object-fit:cover;object-position:50% 20%;border-radius:24px;box-shadow:var(--sh)}
+.about-t .eyebrow{margin:0}.about-t h1{font-size:clamp(2.1rem,6vw,3.2rem);line-height:1.05;color:var(--link);margin:.15em 0 .5em}
+.about-t p{font-size:1.08rem;line-height:1.75;max-width:36rem}
+.about-t .about-v{font:italic 500 1.15rem/1.6 var(--serif);color:var(--link);margin:1.4rem 0;padding-top:1rem;border-top:1px solid var(--line)}
+.about-t .about-s{display:grid;gap:.1rem;margin:0 0 1.6rem}.about-s strong{font:600 1.9rem/1.1 var(--serif);color:var(--ink)}.about-s span{color:var(--mute);font-size:.92rem}
+.about-t .row{max-width:none}
