@@ -190,23 +190,61 @@ async function universo(slug){
   const {data:it,error:e2}=await sb.from('universe_items').select('*').eq('universe_id',u.id).order('position');if(e2)throw e2;
   app.innerHTML=`<h1>${esc(u.name)}</h1>${u.description?`<p>${esc(u.description)}</p>`:''}${it.length?it.map(i=>`<div class="box"><span class="tag">${IT[i.item_type]}</span><h3>${esc(i.title)}</h3>${i.body?`<p>${esc(i.body)}</p>`:''}${i.url?`<a class="btn alt sm" href="${esc(i.url)}" target="_blank" rel="noopener noreferrer">Abrir link</a>`:''}</div>`).join(''):state('Este universo ainda não tem conteúdo.')}<p><a class="btn alt sm" href="#/universos">Todos os universos</a></p>`;
 }
-async function editarConta(){
+// ---- Configurações: menu em hierarquia (seções), como nas telas de referência ----
+const svgI=(d,c='')=>`<svg${c?` class="${c}"`:''} viewBox="0 0 24 24" aria-hidden="true"><path d="${d}"/></svg>`;
+const SI={
+  conta:'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0',
+  aparencia:'M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4',
+  privacidade:'M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z',
+  ajuda:'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.4-1 .9-1 1.7M12 17h.01'
+};
+const SETS=[['conta','Conta','Nome, avatar, e-mail e senha'],['aparencia','Aparência','Tema e tamanho da letra'],['privacidade','Privacidade e cookies','O que fica guardado neste aparelho'],['ajuda','Ajuda e informações legais','Termos, políticas e contato']];
+const CHEV=svgI('M9 6l6 6-6 6','chev');
+const srow=(label,value,body)=>`<details class="srow"><summary><span class="sl">${label}</span><span class="sv">${value}</span>${CHEV}</summary><div class="sbody">${body}</div></details>`;
+const sflat=(label,right)=>`<div class="srow flat"><span class="sl">${label}</span><span class="sr">${right}</span></div>`;
+const slink=(href,label,ext)=>`<a class="srow link" href="${href}"${ext?' target="_blank" rel="noopener noreferrer"':''}><span class="sv">${label}</span>${CHEV}</a>`;
+const sgroup=(t,inner)=>`<div class="sgroup"><h3>${t}</h3>${inner}</div>`;
+
+async function setConta(){
+  if(!user)return `<p class="state">Entre na sua conta para editar seus dados.</p><p class="row"><a class="btn" href="#/login">Entrar</a><a class="btn alt" href="#/cadastro">Criar conta</a></p>`;
   const {data:p}=await sb.from('profiles').select('display_name,avatar_path').eq('id',user.id).maybeSingle();
-  app.innerHTML=`<p><a class="btn alt sm" href="#/configuracoes">← Configurações</a></p><h1>Editar conta</h1>${profileBox(p,1)}
-  <div class="box"><h3>E-mail</h3><p class="mute">E-mail atual: ${esc(user.email)}. Enviamos um link de confirmação; o e-mail só muda depois que você confirmar.</p><form data-f="chemail"><label>Novo e-mail<input name="e" type="email" required autocomplete="email"></label><button>Alterar e-mail</button></form></div>
-  <div class="box"><h3>Senha</h3><form data-f="chpass"><label>Nova senha<input name="p" type="password" minlength="6" autocomplete="new-password" required></label><label>Repita a nova senha<input name="p2" type="password" minlength="6" autocomplete="new-password" required></label><button>Alterar senha</button></form><p><button class="alt" data-a="resetmail">Receber link de redefinição por e-mail</button></p></div>`;
-}
-async function configuracoes(){
-  const cur=document.documentElement.dataset.theme;
   let dr=null;
-  if(user&&!isAdmin){try{const r=await sb.from('account_deletion_requests').select('scheduled_for').maybeSingle();if(!r.error)dr=r.data}catch(e){}}
-  const T=[['light','Claro','#FBF4EB'],['dark','Escuro','#4A3340'],['sepia','Sépia','#F5E6CC']];
-  const acc=user?`<div class="box"><h3>Editar conta</h3><p class="mute">Altere seu nome, avatar, e-mail e senha.</p><p><a class="btn" href="#/configuracoes/conta">Editar conta</a></p></div>
-  <div class="box"><h3>Sair</h3><p class="mute">Encerra a sessão neste aparelho. Sua conta e seus livros continuam salvos.</p><p><button class="alt" data-a="logout">Sair da conta</button></p></div>
-  <div class="box"><h3>Excluir conta</h3>${dr?`<p><strong>Exclusão agendada.</strong> Sua conta será excluída até ${new Date(dr.scheduled_for).toLocaleString('pt-BR',{dateStyle:'long',timeStyle:'short'})}. Até lá você mantém o acesso aos seus livros e pode cancelar.</p><p><button class="alt" data-a="delcancel">Cancelar exclusão</button></p>`:`<p class="mute">Depois de você confirmar, a exclusão é concluída em até 3 dias corridos. Nesse período você mantém o acesso aos seus livros e pode cancelar. Ao concluir, o acesso pela conta é encerrado e os dados pessoais que não precisem ser mantidos por obrigação legal são apagados ou anonimizados.</p><p><button class="danger" data-a="delacc">Solicitar exclusão da conta</button></p>`}</div>`
-  :'<div class="box"><h3>Conta</h3><p class="mute"><a class="btn alt sm" href="#/login">Entre</a> ou <a class="btn alt sm" href="#/cadastro">cadastre-se</a> para gerenciar sua conta.</p></div>';
-  app.innerHTML=`<h1>Configurações</h1><div class="box"><h3>Aparência</h3><p class="mute">${user?'Sua escolha fica salva na sua conta e vale em qualquer aparelho.':'Sua escolha vale enquanto a página estiver aberta. Para lembrá-la neste navegador, permita as preferências de aparência em Preferências de cookies. Entre para salvá-la na sua conta.'}</p><div class="opts" role="group" aria-label="Tema">${T.map(([k,n,g])=>`<button class="opt" data-a="theme" data-t="${k}" aria-pressed="${k===cur}"><i style="background:${g}"></i>${n}</button>`).join('')}</div></div><div class="box"><h3>Cookies</h3><p class="mute">Escolha quais preferências este navegador pode guardar neste aparelho.</p><p><button type="button" class="alt" data-a="cookieprefs">Preferências de cookies</button></p></div>${acc}<div class="box"><h3>Informações legais</h3><p class="mute">Como seus dados são tratados, as regras de uso, a compra e as demais políticas.</p><p class="row"><a class="btn alt" href="#/politicas">Termos e Políticas</a><a class="btn alt" href="#/privacidade">Política de Privacidade</a><a class="btn alt" href="#/termos">Termos de Uso</a><a class="btn alt" href="#/compra">Compra e Reembolso</a></p></div>`;
+  if(!isAdmin){try{const r=await sb.from('account_deletion_requests').select('scheduled_for').maybeSingle();if(!r.error)dr=r.data}catch(e){}}
+  const nm=p?.display_name||'';
+  const del=dr
+    ?`<p><strong>Exclusão agendada.</strong> Sua conta será excluída até ${new Date(dr.scheduled_for).toLocaleString('pt-BR',{dateStyle:'long',timeStyle:'short'})}. Até lá você mantém o acesso aos seus livros e pode cancelar.</p><p><button class="alt" data-a="delcancel">Cancelar exclusão</button></p>`
+    :`<p class="mute">Depois de você confirmar, a exclusão é concluída em até 3 dias corridos. Nesse período você mantém o acesso aos seus livros e pode cancelar. Ao concluir, o acesso pela conta é encerrado e os dados pessoais que não precisem ser mantidos por obrigação legal são apagados ou anonimizados.</p><p><button class="danger" data-a="delacc">Solicitar exclusão da conta</button></p>`;
+  return sgroup('Informações básicas',
+      srow('Avatar',`${avHtml(p?.avatar_path,nm||user.email)}<span class="mute">Alterar</span>`,avPicker(p?.avatar_path))+
+      srow('Nome',esc(nm||'Sem nome'),`<form data-f="profile"><label>Nome de exibição<input name="n" maxlength="60" value="${esc(nm)}"></label><button>Salvar nome</button></form>`))
+    +sgroup('Acesso e segurança',
+      srow('E-mail',esc(user.email),`<p class="mute">Enviamos um link de confirmação ao novo e-mail. Ele só muda depois que você confirmar.</p><form data-f="chemail"><label>Novo e-mail<input name="e" type="email" required autocomplete="email"></label><button>Alterar e-mail</button></form>`)+
+      srow('Senha','••••••••',`<form data-f="chpass"><label>Nova senha<input name="p" type="password" minlength="6" autocomplete="new-password" required></label><label>Repita a nova senha<input name="p2" type="password" minlength="6" autocomplete="new-password" required></label><button>Alterar senha</button></form><p><button class="alt sm" data-a="resetmail">Receber link de redefinição por e-mail</button></p>`)+
+      sflat('Conta criada em',fmt(user.created_at)))
+    +sgroup('Sessão',sflat('Encerra a sessão neste aparelho','<button class="alt sm" data-a="logout">Sair da conta</button>'))
+    +(isAdmin?'':sgroup('Excluir conta',del));
 }
+function setAparencia(){
+  const cur=document.documentElement.dataset.theme;
+  const T=[['light','Claro','#FBF4EB'],['dark','Escuro','#4A3340'],['sepia','Sépia','#F5E6CC']];
+  return sgroup('Tema',`<p class="mute">${user?'Sua escolha fica salva na sua conta e vale em qualquer aparelho.':'Sua escolha vale enquanto a página estiver aberta. Para lembrá-la neste navegador, permita as preferências de aparência em Privacidade e cookies. Entre para salvá-la na sua conta.'}</p><div class="opts" role="group" aria-label="Tema">${T.map(([k,n,g])=>`<button class="opt" data-a="theme" data-t="${k}" aria-pressed="${k===cur}"><i style="background:${g}"></i>${n}</button>`).join('')}</div>`)
+    +sgroup('Leitura',sflat('Tamanho da letra dos capítulos','<span class="row"><button class="alt sm" data-a="fs" data-d="-1" aria-label="Diminuir fonte">A−</button><button class="alt sm" data-a="fs" data-d="1" aria-label="Aumentar fonte">A+</button></span>')+'<div class="read sprev"><p>É assim que o texto dos capítulos vai aparecer para você.</p></div>');
+}
+function setPrivacidade(){
+  return sgroup('Neste aparelho','<p class="mute">O site guarda no navegador só o necessário para manter seu login e, se você permitir, lembrar o tema e o tamanho da letra.</p>'+sflat('Preferências de cookies','<button type="button" class="alt sm" data-a="cookieprefs">Gerenciar</button>'))
+    +sgroup('Documentos',slink('#/privacidade','Política de Privacidade')+slink('#/cookies','Cookies e Armazenamento'))
+    +(user?sgroup('Seus dados',`<p class="mute">Para corrigir seus dados ou excluir a conta, use a seção <a href="#/configuracoes/conta">Conta</a>. Outros pedidos sobre privacidade: <a href="mailto:${CONTATO}">${CONTATO}</a>.</p>`):'');
+}
+function setAjuda(){
+  return sgroup('Termos e políticas',slink('#/politicas','Todas as políticas')+LEGAL_DOCS.map(([k,s,t])=>slink('#/'+s,esc(t))).join(''))
+    +sgroup('Fale com a gente',slink('mailto:'+CONTATO,esc(CONTATO))+(INSTAGRAM_URL?slink(INSTAGRAM_URL,'Instagram '+esc(INSTAGRAM_USER),1):''));
+}
+async function configuracoes(sec){
+  const ok=SETS.some(s=>s[0]===sec),cur=ok?sec:(user?'conta':'aparencia'),meta=SETS.find(s=>s[0]===cur);
+  const body=await ({conta:setConta,aparencia:async()=>setAparencia(),privacidade:async()=>setPrivacidade(),ajuda:async()=>setAjuda()}[cur])();
+  app.innerHTML=`<div class="set${ok?' has-sec':''}"><aside class="set-nav"><h1>Configurações</h1><div class="set-list" role="navigation" aria-label="Seções das configurações">${SETS.map(([k,t,d])=>`<a class="set-i${k===cur?' on':''}" href="#/configuracoes/${k}"${k===cur?' aria-current="page"':''}>${svgI(SI[k],'si')}<span><b>${t}</b><small>${d}</small></span>${CHEV}</a>`).join('')}</div></aside><div class="set-main"><a class="set-back" href="#/configuracoes">Configurações</a><h2>${meta[1]}</h2>${body}</div></div>`;
+}
+
 
 // ---- experiência administrativa (o servidor valida cada ação via RLS/RPC; isto só organiza a interface) ----
 const deny=()=>{app.innerHTML=state('Acesso negado. Esta área é restrita ao administrador.',1)};
@@ -216,9 +254,29 @@ const loc=i=>i?new Date(new Date(i)-new Date().getTimezoneOffset()*6e4).toISOStr
 async function count(t,f){let q=sb.from(t).select('id',{count:'exact',head:true});if(f)q=f(q);const {count:c,error}=await q;if(error)throw error;return c??0}
 async function admin(){
   if(!await guard())return;
-  const [pend,ord,bk,us]=await Promise.all([count('payments',q=>q.in('status',['pending','proof_submitted'])),count('orders'),count('books'),count('profiles')]);
-  const PW=await pixWarn();
-  app.innerHTML=`${PW}<h1>Painel administrativo</h1><div class="grid">${[['/admin/pedidos',pend,'Pagamentos a conferir'],['/admin/pedidos',ord,'Pedidos'],['/admin/livros',bk,'Livros'],['/admin/usuarios',us,'Usuários']].map(([h,n,t])=>`<a class="tile" href="#${h}"><h2>${n}</h2><span class="mute">${t}</span></a>`).join('')}</div><p class="row"><a class="btn alt sm" href="#/admin/avatares">Gerenciar avatares</a><a class="btn alt sm" href="#/admin/configuracoes">Dados de pagamento (enviados por e-mail)</a></p>`;
+  const now=new Date(),mk=d=>d.getFullYear()+'-'+d.getMonth();
+  const M6=[...Array(6)].map((_,i)=>{const d=new Date(now.getFullYear(),now.getMonth()-5+i,1);return {k:mk(d),l:d.toLocaleDateString('pt-BR',{month:'short'}).replace('.',''),v:0}});
+  const [pend,nBk,nPub,nUs,nCp,oR,PW]=await Promise.all([
+    count('payments',q=>q.in('status',['pending','proof_submitted'])),
+    count('books'),count('books',q=>q.eq('status','published')),count('profiles'),
+    count('coupons',q=>q.eq('is_active',true)).catch(()=>null),
+    sb.from('orders').select('id,amount_cents,status,created_at,paid_at,books(title)').order('created_at',{ascending:false}).limit(500),
+    pixWarn()]);
+  if(oR.error)throw oR.error;
+  const O=oR.data||[],paid=O.filter(o=>o.status==='paid'),rev=paid.reduce((s,o)=>s+o.amount_cents,0);
+  let revM=0;
+  paid.forEach(o=>{const k=mk(new Date(o.paid_at||o.created_at)),m=M6.find(x=>x.k===k);if(m)m.v+=o.amount_cents;if(k===mk(now))revM+=o.amount_cents});
+  const mx=Math.max(1,...M6.map(m=>m.v));
+  const top=Object.values(paid.reduce((a,o)=>{const t=o.books?.title||'Livro',r=a[t]=a[t]||{t,n:0,v:0};r.n++;r.v+=o.amount_cents;return a},{})).sort((a,b)=>b.v-a.v).slice(0,5),tmx=Math.max(1,...top.map(x=>x.v));
+  const kp=(h,l,v,s,cls)=>{const inner=`<small>${l}</small><b>${v}</b><span>${s}</span>`;return h?`<a class="kpi${cls?' '+cls:''}" href="#${h}">${inner}</a>`:`<div class="kpi${cls?' '+cls:''}">${inner}</div>`};
+  const SH=[['/admin/cupons','cupons','Novo cupom'],['/admin/pedidos','pedidos','Conferir pedidos'],['/admin/livros','livros','Livros'],['/admin/importar','importar','Importar capítulos'],['/admin/traducoes','trad','Traduções'],['/admin/usuarios','users','Usuários'],['/admin/avatares','avatar','Avatares'],['/admin/configuracoes','pix','Pagamento (Pix)']];
+  app.innerHTML=`${PW}<div class="adm-h"><div><p class="eyebrow">Administração</p><h1>Painel</h1></div><a class="btn" href="#/admin/cupons">Novo cupom</a></div>
+  ${pend?`<div class="alertb"><div><strong>${pend} ${pend===1?'pagamento aguarda':'pagamentos aguardam'} conferência.</strong> <span class="mute">Confirme o recebimento do Pix para liberar o acesso.</span></div><a class="btn sm" href="#/admin/pedidos">Conferir agora</a></div>`:''}
+  <div class="kpis">${kp('/admin/pedidos','Receita confirmada',brl(rev),`${paid.length} ${paid.length===1?'pedido pago':'pedidos pagos'}${O.length>=500?' (últimos 500 pedidos)':''}`)}${kp('/admin/pedidos','Receita no mês',brl(revM),now.toLocaleDateString('pt-BR',{month:'long',year:'numeric'}))}${kp('/admin/pedidos','A conferir',pend,pend===1?'pagamento':'pagamentos',pend?'hot':'')}${kp('/admin/livros','Livros',`${nPub}<small style="display:inline;font-size:1rem"> / ${nBk}</small>`,'publicados / total')}${kp('/admin/usuarios','Leitores',nUs,'contas criadas')}${kp('/admin/cupons','Cupons ativos',nCp===null?'—':nCp,nCp===null?'instale o cupons.sql':'em vigor agora')}</div>
+  <div class="adm-2"><div class="acard"><h3>Vendas nos últimos 6 meses</h3>${rev?`<div class="chb" role="img" aria-label="Receita confirmada por mês">${M6.map(m=>`<div><em>${m.v?'R$ '+Math.round(m.v/100):''}</em><i style="height:${Math.max(3,Math.round(m.v/mx*120))}px"></i><small>${esc(m.l)}</small></div>`).join('')}</div>`:state('Ainda não há pedidos pagos.')}</div>
+  <div class="acard"><h3>Livros mais vendidos</h3>${top.length?`<ul class="toplist">${top.map(x=>`<li><div><span>${esc(x.t)}</span><b>${x.n}× · ${brl(x.v)}</b></div><i style="width:${Math.max(4,Math.round(x.v/tmx*100))}%"></i></li>`).join('')}</ul>`:state('As vendas aparecem aqui.')}</div></div>
+  <div class="acard"><h3>Últimos pedidos</h3>${O.length?O.slice(0,6).map(o=>`<div class="orow"><strong>${esc(o.books?.title||'Livro')}</strong><span class="tag">${OS[o.status]||esc(o.status)}</span><span>${brl(o.amount_cents)}</span><span class="mute">${fmt(o.created_at)}</span></div>`).join('')+'<p style="margin:.9rem 0 0"><a class="btn alt sm" href="#/admin/pedidos">Ver todos os pedidos</a></p>':state('Nenhum pedido ainda.')}</div>
+  <h2 style="margin-top:2rem">Atalhos</h2><div class="shorts">${SH.map(([h,i,t])=>`<a class="short" href="#${h}">${svgI(ADI[i])}${t}</a>`).join('')}</div>`;
 }
 async function adminLivros(){
   if(!await guard())return;
@@ -241,14 +299,16 @@ const pixWarn=async()=>{try{const {data}=await sb.from('pix_settings').select('p
 async function adminPedidos(){
   if(!await guard())return;
   const PQ=s=>sb.from('payments').select(s).neq('status','cancelled').order('created_at',{ascending:false}).limit(100);
-  let {data,error}=await PQ('id,status,amount_cents,created_at,rejected_reason,orders(user_id,order_number,group_id,books(title),profiles(display_name))');if(error)({data,error}=await PQ('id,status,amount_cents,created_at,rejected_reason,orders(user_id,order_number,books(title),profiles(display_name))'));if(error)throw error;
+  let {data,error}=await PQ('id,status,amount_cents,created_at,rejected_reason,orders(id,user_id,order_number,group_id,books(title),profiles(display_name))');if(error)({data,error}=await PQ('id,status,amount_cents,created_at,rejected_reason,orders(id,user_id,order_number,books(title),profiles(display_name))'));if(error)throw error;
   let PR={};try{const {data:pp,error:pe}=await sb.from('payments').select('id,proof_path').not('proof_path','is',null);if(!pe&&pp)PR=Object.fromEntries(pp.map(x=>[x.id,x.proof_path]))}catch(e){}
   let BY={};try{const {data:bb,error:be}=await sb.rpc('admin_order_buyers');if(!be&&bb)BY=Object.fromEntries(bb.map(x=>[x.payment_id,x]))}catch(e){}
+  let CR={};try{const {data:cc,error:ce}=await sb.from('coupon_redemptions').select('order_id,discount_cents,coupon_code');if(!ce&&cc)cc.forEach(x=>{CR[x.order_id]=x})}catch(e){}
+  const cpT=ids=>{const r=ids.map(i=>CR[i]).filter(Boolean);return r.length?` <span class="tag sun">Cupom ${esc(r[0].coupon_code||'')} −${brl(r.reduce((t,x)=>t+x.discount_cents,0))}</span>`:''};
   const PW=await pixWarn();
   const GM={};data.forEach(x=>{const g=x.orders?.group_id;if(g)(GM[g]=GM[g]||[]).push(x)});
   const GH=Object.entries(GM).map(([g,L])=>{const tot=L.reduce((s,x)=>s+x.amount_cents,0),f=L[0],o=f.orders||{},pr=L.map(x=>PR[x.id]).find(Boolean),sts=[...new Set(L.map(x=>x.status))],act=L.some(x=>['pending','proof_submitted'].includes(x.status)),cf=L.some(x=>['pending','proof_submitted','rejected'].includes(x.status));
-    return `<div class="box"><span class="tag sun">Pedido em grupo</span> <strong>${L.length} livros</strong> ${brl(tot)}<br><span class="mute">${L.map(x=>esc(x.orders?.books?.title||'Livro')).join(' · ')}</span><br><span class="mute">${esc(BY[f.id]?.buyer_name||o.profiles?.display_name||String(o.user_id||'').slice(0,8))}${BY[f.id]?.buyer_email?` · ${esc(BY[f.id].buyer_email)}`:''} · ${fmt(f.created_at)}</span><br>${sts.map(s=>`<span class="tag">${PAYL[s]}</span>`).join(' ')} ${pr?`<button class="alt sm" data-a="proof" data-p="${esc(pr)}">Ver comprovante</button>`:''}<div class="row">${cf?`<button data-a="gconfirm" data-g="${g}">Confirmar o pedido inteiro</button>`:''}${act?`<button class="alt" data-a="greject" data-g="${g}">Rejeitar</button>`:''}${cf?`<button class="alt" data-a="gcancel" data-g="${g}">Cancelar pedido</button>`:''}</div></div>`}).join('');
-  app.innerHTML=`${PW}<h1>Pedidos e pagamentos</h1><p class="mute">Confira o recebimento do Pix antes de confirmar. Confirmar libera o acesso ao livro.</p>${GH}${data.length?data.filter(x=>!x.orders?.group_id).map(x=>{const o=x.orders||{};return `<div class="box"><strong>${esc(o.books?.title||'Livro')}</strong> ${brl(x.amount_cents)} <span class="mute">Pedido ${ordN(o.order_number)}</span><br><span class="mute">${esc(BY[x.id]?.buyer_name||o.profiles?.display_name||String(o.user_id||'').slice(0,8))}${BY[x.id]?.buyer_email?` · ${esc(BY[x.id].buyer_email)}`:''} · ${fmt(x.created_at)}</span><br><span class="tag">${PAYL[x.status]}</span> ${PR[x.id]?`<button class="alt sm" data-a="proof" data-p="${esc(PR[x.id])}">Ver comprovante</button>`:(x.status==='proof_submitted'?'<span class="mute">sem comprovante anexado</span>':'')}${x.rejected_reason?` <span class="mute">${esc(x.rejected_reason)}</span>`:''}
+    return `<div class="box"><span class="tag sun">Pedido em grupo</span> <strong>${L.length} livros</strong> ${brl(tot)}<br><span class="mute">${L.map(x=>esc(x.orders?.books?.title||'Livro')).join(' · ')}</span><br><span class="mute">${esc(BY[f.id]?.buyer_name||o.profiles?.display_name||String(o.user_id||'').slice(0,8))}${BY[f.id]?.buyer_email?` · ${esc(BY[f.id].buyer_email)}`:''} · ${fmt(f.created_at)}</span><br>${sts.map(s=>`<span class="tag">${PAYL[s]}</span>`).join(' ')}${cpT(L.map(x=>x.orders?.id))} ${pr?`<button class="alt sm" data-a="proof" data-p="${esc(pr)}">Ver comprovante</button>`:''}<div class="row">${cf?`<button data-a="gconfirm" data-g="${g}">Confirmar o pedido inteiro</button>`:''}${act?`<button class="alt" data-a="greject" data-g="${g}">Rejeitar</button>`:''}${cf?`<button class="alt" data-a="gcancel" data-g="${g}">Cancelar pedido</button>`:''}</div></div>`}).join('');
+  app.innerHTML=`${PW}<h1>Pedidos e pagamentos</h1><p class="mute">Confira o recebimento do Pix antes de confirmar. Confirmar libera o acesso ao livro.</p>${GH}${data.length?data.filter(x=>!x.orders?.group_id).map(x=>{const o=x.orders||{};return `<div class="box"><strong>${esc(o.books?.title||'Livro')}</strong> ${brl(x.amount_cents)} <span class="mute">Pedido ${ordN(o.order_number)}</span><br><span class="mute">${esc(BY[x.id]?.buyer_name||o.profiles?.display_name||String(o.user_id||'').slice(0,8))}${BY[x.id]?.buyer_email?` · ${esc(BY[x.id].buyer_email)}`:''} · ${fmt(x.created_at)}</span><br><span class="tag">${PAYL[x.status]}</span>${cpT([o.id])} ${PR[x.id]?`<button class="alt sm" data-a="proof" data-p="${esc(PR[x.id])}">Ver comprovante</button>`:(x.status==='proof_submitted'?'<span class="mute">sem comprovante anexado</span>':'')}${x.rejected_reason?` <span class="mute">${esc(x.rejected_reason)}</span>`:''}
   <div class="row">${['pending','proof_submitted','rejected'].includes(x.status)?`<button data-a="confirm" data-id="${x.id}">Confirmar pagamento</button>`:''}${['pending','proof_submitted'].includes(x.status)?`<button class="alt" data-a="reject" data-id="${x.id}">Rejeitar</button>`:''}${['pending','proof_submitted','rejected'].includes(x.status)?`<button class="alt" data-a="cancelorder" data-id="${x.id}">Cancelar pedido</button>`:''}</div></div>`}).join(''):state('Nenhum pedido ainda.')}`;
 }
 async function adminUsuarios(){
@@ -366,14 +426,14 @@ document.getElementById('hs').onsubmit=e=>{e.preventDefault();go('/catalogo?q='+
 document.addEventListener('click',e=>{const d=document.querySelector('.acct[open]');if(d&&!d.contains(e.target))d.open=false});
 function header(){
   const cur=(location.hash.slice(1)||'/').split('?')[0],adm=cur.startsWith('/admin');
-  const on=p=>(p==='/universos'&&/^\/quiz/.test(cur))||((p==='/'||adm)?cur===p:(cur===p||cur.startsWith(p+'/')));
-  const pubL=[['/','Início'],['/catalogo','Catálogo'],['/universos','Universos e Quizzes'],['/blog','Blog'],['/sobre','Sobre']];
-  const admL=[['/admin','Painel'],['/admin/livros','Livros'],['/admin/pedidos','Pedidos'],['/admin/usuarios','Usuários'],['/admin/importar','Importar'],['/admin/traducoes','Traduções'],['/admin/avatares','Avatares'],['/admin/configuracoes','Pagamento'],['/','Voltar ao site']];
+  const on=p=>(p==='/descobrir'&&/^\/(universos|quizzes?)(\/|$)/.test(cur))||((p==='/'||adm)?cur===p:(cur===p||cur.startsWith(p+'/')));
+  const pubL=[['/','Início'],['/catalogo','Catálogo'],['/descobrir','Descobrir'],['/blog','Blog'],['/sobre','Sobre']];
+  const admL=[['/admin','Painel'],['/admin/livros','Livros'],['/admin/pedidos','Pedidos'],['/admin/cupons','Cupons'],['/admin/usuarios','Usuários'],['/admin/importar','Importar'],['/admin/traducoes','Traduções'],['/admin/avatares','Avatares'],['/admin/configuracoes','Pagamento'],['/','Voltar ao site']];
   const nm=user?(user.user_metadata?.display_name||user.email):'';
   const a=user?`<details class="acct"><summary aria-label="Minha conta">${avHtml(myProf?.avatar_path,myProf?.display_name||nm)}</summary><div class="acct-m"><a href="#/minha-estante">Minha estante</a><a href="#/minha-conta">Minha conta</a>${isAdmin?'<a href="#/admin">Administração</a>':''}<button class="alt sm" data-a="logout">Sair</button></div></details>`:'<a class="btn" href="#/login">Entrar</a>';
   nav.innerHTML=(adm?admL:pubL).map(([p,t])=>`<a href="#${p}"${on(p)?' class="on" aria-current="page"':''}>${t}</a>`).join('')+`<span class="navauth">${user?'<button class="alt" data-a="logout">Sair</button>':'<a class="btn" href="#/login">Entrar</a>'}</span>`;
   document.getElementById('auth').innerHTML=a;document.getElementById('admtag').hidden=!adm;nav.classList.remove('open');menu.setAttribute('aria-expanded','false');
-  const T=[['/','Início','h'],['/catalogo','Catálogo','c'],['/universos','Descobrir','o']];
+  const T=[['/','Início','h'],['/catalogo','Catálogo','c'],['/descobrir','Descobrir','o']];
   document.getElementById('tabs').innerHTML=T.map(([p,t,i])=>`<a href="#${p}"${on(p)?' class="on" aria-current="page"':''}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="${IC[i]}"/></svg>${t}</a>`).join('');
   document.body.classList.toggle('is-adm',adm);
   const gr=document.getElementById('gear');gr.classList.toggle('on',cur.startsWith('/configuracoes'));if(cur.startsWith('/configuracoes'))gr.setAttribute('aria-current','page');else gr.removeAttribute('aria-current');
@@ -469,7 +529,7 @@ async function checkout(slug){
   if(CK.slug!==slug){CK.slug=slug;CK.step=1;CK.order=null;CK.pix=undefined;CK.qr=null}
   const owned=!!(await sb.from('book_entitlements').select('id').eq('user_id',user.id).eq('book_id',b.id).eq('status','active').maybeSingle()).data;
   if(owned){CK.step=4;CK.done=true}else CK.done=false;
-  if(!owned){CK.order=await ckLoadOrder(b);if(CK.order){try{const {data:gg}=await sb.from('orders').select('group_id').eq('id',CK.order.id).maybeSingle();if(gg&&gg.group_id){go('/checkout-carrinho');return}}catch(e){}}if(CK.order&&CK.step<3)CK.step=3;if(CK.order&&CK.step===3&&CK.pix===undefined)CK.pix=await ckPixFor(CK.order.id);
+  if(!owned){CK.order=await ckLoadOrder(b);if(CK.order){try{const {data:gg}=await sb.from('orders').select('group_id').eq('id',CK.order.id).maybeSingle();if(gg&&gg.group_id){go('/checkout-carrinho');return}}catch(e){}}if(CK.order&&CK.step<3)CK.step=3;if(CK.order&&CK.step===3&&CK.pix===undefined)CK.pix=await ckPixFor(CK.order.id);CK.cp=CK.order?await cpInfo([CK.order.id]):null;
     if(!CK.order){const {data:l}=await sb.from('orders').select('id,payments(status,rejected_reason)').eq('user_id',user.id).eq('book_id',b.id).neq('status','pending').order('created_at',{ascending:false}).limit(1).maybeSingle();CK.last=l;if(CK.step>=3)CK.step=1}}
   CK.book=b;ckRender();
 }
@@ -488,10 +548,11 @@ function ckRender(){
     <div class="ckrow"><button>Continuar para o pagamento</button><button type="button" class="alt" data-a="ckgo" data-s="1">Voltar</button></div></form></div>`;return}
   if(st===3){
     const o=CK.order,pp=CK.pix?.p,qr=CK.pix?.qr,conf=!!(pp&&(pp.copy_paste_code||pp.pix_key||qr));
-    const proofDone=o?.pay?.status==='proof_submitted';
+    const proofDone=o?.pay?.status==='proof_submitted';const cpb=cpBox([o.id],CK.cp,o?.pay?.status==='pending');
     app.innerHTML=`${head}<h1>Pagamento via Pix</h1><p class="mute">Pedido ${ordN(o.order_number)} · ${esc(b.title)}</p>
     ${conf?`<div class="ckpay"><div>${qr?`<img class="ckqr" src="${esc(qr)}" alt="QR Code Pix">`:'<p class="mute">QR Code não cadastrado.</p>'}</div><div><p class="ckval">Pague ${brl(o.amount_cents)} via Pix</p>${pp.copy_paste_code?`<p class="eyebrow">Pix Copia e Cola</p><code class="ckcode">${esc(pp.copy_paste_code)}</code><button type="button" class="alt sm" data-a="copy" data-c="${esc(pp.copy_paste_code)}">Copiar código</button>`:''}${pp.receiver_name?`<p>Recebedor: ${esc(pp.receiver_name)}</p>`:''}${pp.pix_key?`<p>Chave Pix: ${esc(pp.pix_key)}</p>`:''}<p class="mute">${pp.instructions?esc(pp.instructions):'Abra o app do seu banco, escolha pagar com Pix e use o QR Code ou o código. Confira o valor antes de confirmar.'}</p></div></div>`
     :`<div class="ckno"><p class="ckval">Pague ${brl(o.amount_cents)} via Pix</p><p>Os dados do Pix deste pedido foram enviados para o seu e-mail (${esc(user.email)}). Se não encontrar, veja o spam ou peça o reenvio.</p><p><button class="alt sm" data-a="resend" data-id="${o.id}">Reenviar instruções por e-mail</button></p></div>`}
+    ${cpb}
     <div class="ckno"><h3 style="margin-top:0">Depois de pagar, envie o comprovante</h3><p class="mute">O envio do comprovante é obrigatório. Ele não confirma o pagamento por si só: o livro é liberado quando a administração conferir que o valor foi recebido.</p>${proofDone?'<p>Comprovante já enviado. Você pode enviar outro arquivo, se precisar.</p>':''}<div><label>Comprovante (imagem ou PDF, até 5 MB)<input type="file" id="proof" accept="image/*,application/pdf"></label><div class="ckrow" style="margin-top:.8rem"><button type="button" data-a="paid" data-m="file">Enviar comprovante</button></div><p class="mute" style="margin-top:.8rem">Está com dificuldade para enviar? <a href="mailto:${CONTATO}?subject=${encodeURIComponent('Pedido '+ordN(o.order_number)+' - dificuldade para enviar o comprovante')}">Fale com o suporte por e-mail</a>.</p></div></div>
     <div class="ckrow"><button class="alt" data-a="ckgo" data-s="4">Ver status do pedido</button></div></div>`;return}
   // etapa 4 — confirmação
@@ -526,7 +587,7 @@ async function mailOrder(id,quiet){
   const M={email_not_configured:'Pedido criado, mas o envio por e-mail ainda não está configurado. Fale com a administração.',too_soon:'O e-mail foi enviado há pouco. Confira sua caixa de entrada (e o spam).'};
   toast(M[c]||(st===404&&!c?'Pedido criado, mas a função de e-mail não está publicada no servidor (erro 404).':'Pedido criado, mas o e-mail falhou'+(st||c?` (${[st,c].filter(Boolean).join(': ')})`:'')+'. Use "Reenviar instruções por e-mail".'));
 }
-const seg=a=>`<div class="seg"><a href="#/universos"${a==='u'?' class="on" aria-current="page"':''}>Universos</a><a href="#/quizzes"${a==='q'?' class="on" aria-current="page"':''}>Quizzes</a></div>`;
+const seg=a=>`<div class="seg"><a href="#/descobrir"${a==='d'?' class="on" aria-current="page"':''}>Descobrir</a><a href="#/universos"${a==='u'?' class="on" aria-current="page"':''}>Universos</a><a href="#/quizzes"${a==='q'?' class="on" aria-current="page"':''}>Quizzes</a></div>`;
 async function quizzes(){
   const {data,error}=await sb.from('quizzes').select('id,title,description,books(title),universes(name)').eq('is_published',true).order('created_at');if(error)throw error;
   app.innerHTML=`${seg('q')}<h1>Quizzes</h1>${data.length?data.map(q=>`<div class="box"><h3>${esc(q.title)}</h3>${q.description?`<p>${esc(q.description)}</p>`:''}${q.books?.title||q.universes?.name?`<p class="mute">${esc(q.books?.title||q.universes?.name)}</p>`:''}<a class="btn" href="#/quiz/${q.id}">Responder quiz</a></div>`).join(''):state('Nenhum quiz cadastrado ainda.')}`;
@@ -935,8 +996,10 @@ async function checkoutCarrinho(){
   const gid=rows[0]?.group_id,G=rows.filter(o=>o.group_id===gid),open=G.some(o=>o.status==='pending');
   if(open){
     const total=G.reduce((s,o)=>s+o.amount_cents,0),pays=G.flatMap(o=>(o.payments||[]).filter(p=>['pending','proof_submitted'].includes(p.status)).map(p=>p.id)),sent=G.flatMap(o=>o.payments||[]).some(p=>p.status==='proof_submitted'),px=await ckPixFor(G[0].id),pp=px.p,qr=px.qr,conf=!!(pp&&(pp.copy_paste_code||pp.pix_key||qr));
+    const cpG=await cpInfo(G.map(o=>o.id));
     app.innerHTML=`<div class="ck">${ckStepper(sent?4:3)}<h1>Pagamento via Pix</h1><p class="mute">Pedido em grupo · ${G.length} livros</p><ul class="mute">${G.map(o=>`<li>${esc(o.books?.title||'Livro')} · ${brl(o.amount_cents)}</li>`).join('')}</ul>
     ${conf?`<div class="ckpay"><div>${qr?`<img class="ckqr" src="${esc(qr)}" alt="QR Code Pix">`:''}</div><div><p class="ckval">Pague ${brl(total)} via Pix (valor total)</p>${pp.copy_paste_code?`<p class="eyebrow">Pix Copia e Cola</p><code class="ckcode">${esc(pp.copy_paste_code)}</code><button type="button" class="alt sm" data-a="copy" data-c="${esc(pp.copy_paste_code)}">Copiar código</button>`:''}${pp.receiver_name?`<p>Recebedor: ${esc(pp.receiver_name)}</p>`:''}${pp.pix_key?`<p>Chave Pix: ${esc(pp.pix_key)}</p>`:''}</div></div>`:`<div class="ckno"><p class="ckval">Pague ${brl(total)} via Pix (valor total)</p><p>Os dados do Pix não estão disponíveis na tela agora. Escreva para o suporte informando o seu pedido.</p></div>`}
+    ${cpBox(G.map(o=>o.id),cpG,!sent)}
     <div class="ckno"><h3 style="margin-top:0">Depois de pagar, envie um comprovante</h3><p class="mute">Um único comprovante vale para o pedido inteiro. Ele não confirma o pagamento por si só: os livros são liberados juntos, quando a administração conferir que o valor total foi recebido.</p>${sent?'<p>Comprovante já enviado. Você pode enviar outro arquivo, se precisar.</p>':''}<label>Comprovante (imagem ou PDF, até 5 MB)<input type="file" id="gproof" accept="image/*,application/pdf"></label><div class="ckrow" style="margin-top:.8rem"><button type="button" data-a="cartproof" data-pays='${JSON.stringify(pays)}'>Enviar comprovante</button></div>${sent?'<p>A administração vai conferir em até 4 dias corridos. Os livros continuam bloqueados até a confirmação.</p>':''}</div></div>`;return}
   const {S,pend}=await grpLoad(),ok=S.pay.map(x=>x.b),note='';
   if(!ok.length){const rej=G.some(o=>(o.payments||[]).some(p=>p.status==='rejected'));app.innerHTML=`${H}${note}${G.length?state(rej?'O pagamento do seu último pedido em grupo foi recusado. Os livros continuam bloqueados. Você pode montar um novo pedido.':'Seu último pedido em grupo foi concluído. Veja seus livros na estante.'):state('Seu carrinho está vazio.')}<p class="row"><a class="btn" href="#/minha-estante">Minha estante</a><a class="btn alt" href="#/catalogo">Ver catálogo</a></p></div>`;return}
@@ -963,7 +1026,173 @@ function sobre(){app.innerHTML=`<article class="about"><figure class="about-f"><
 function blog(){app.innerHTML=`<p class="eyebrow">Blog</p><h1>Blog</h1>${BLOG.length?`<div class="ugrid">${BLOG.map(p=>`<a class="uni" href="#/blog/${esc(p.slug)}"><span class="eyebrow">${esc(p.tag||'')}${p.date?' · '+fmt(p.date):''}</span><h3>${esc(p.title)}</h3><p class="clamp">${esc(p.excerpt||'')}</p></a>`).join('')}</div>`:state('O blog estreia em breve.')}`}
 function blogPost(s){const p=BLOG.find(x=>x.slug===s);if(!p){app.innerHTML=state('Texto não encontrado.');return}app.innerHTML=`<article class="legal"><p class="eyebrow">${esc(p.tag||'Blog')}${p.date?' · '+fmt(p.date):''}</p><h1>${esc(p.title)}</h1>${(p.body||[]).map(t=>`<p>${esc(t)}</p>`).join('')}<p><a class="btn alt sm" href="#/blog">← Blog</a></p></article>`}
 
-const routes=[[/^\/checkout-carrinho$/,checkoutCarrinho],[/^\/sobre$/,sobre],[/^\/blog$/,blog],[/^\/blog\/([^/]+)$/,blogPost],[/^\/politicas$/,legalHub],[/^\/(privacidade|termos|compra|politica-da-comunidade|politica-de-spoilers|direitos-autorais|politica-de-traducoes|politica-de-quizzes|cookies)$/,legalSlug],[/^\/admin\/livros\/([^/]+)$/,adminLivroCaps,1],[/^\/$/,home],[/^\/catalogo$/,catalogo],[/^\/livro\/([^/]+)$/,livro],[/^\/login$/,login],[/^\/cadastro$/,cadastro],[/^\/recuperar$/,recuperar],[/^\/minha-conta$/,conta,1],[/^\/minha-estante$/,estante,1],[/^\/quiz\/([^/]+)$/,quiz],[/^\/universos$/,universos],[/^\/universos\/([^/]+)$/,universo],[/^\/quizzes$/,quizzes],[/^\/ler\/([^/]+)\/(\d+)$/,ler],[/^\/admin$/,admin,1],[/^\/admin\/livros$/,adminLivros,1],[/^\/admin\/pedidos$/,adminPedidos,1],[/^\/admin\/usuarios$/,adminUsuarios,1],[/^\/admin\/configuracoes$/,adminPix,1],[/^\/admin\/importar$/,adminImportar,1],[/^\/admin\/traducoes$/,adminTraducoes,1],[/^\/admin\/avatares$/,adminAvatares,1],[/^\/checkout\/([^/]+)$/,checkout],[/^\/carrinho$/,carrinho],[/^\/configuracoes$/,configuracoes],[/^\/configuracoes\/conta$/,editarConta,1]];
+// ======================= v11: Descobrir =======================
+const DI={
+  book:IC.e,
+  spark:'M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z',
+  world:'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM3 12h18M12 3c3.2 3.4 3.2 14.6 0 18M12 3c-3.2 3.4-3.2 14.6 0 18',
+  quiz:'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.4-1 .9-1 1.7M12 17h.01',
+  author:IC.u,
+  blog:'M5 4h14v16H5zM9 9h6M9 13h6M9 17h3',
+  shelf:'M4 19h16M6 19V8h3v11M11 19V5h3v14M16 19v-9l3 1v8',
+  soon:'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 7v5l3 2'
+};
+const pl=(n,s,p)=>`${n} ${n===1?s:p}`;
+async function descobrir(){
+  const [bk,uR,ubR,qR,pgR]=await Promise.all([
+    books(),
+    sb.from('universes').select('id,slug,name,description').order('sort_order'),
+    sb.from('universe_books').select('universe_id,book_id'),
+    (async()=>{let r=await sb.from('quizzes').select('id,title,description,kind,books(title),universes(name)').eq('is_published',true).order('created_at');if(r.error)r=await sb.from('quizzes').select('id,title,description,books(title),universes(name)').eq('is_published',true).order('created_at');return r})(),
+    user?sb.from('reading_progress').select('book_id,progress_percent').eq('user_id',user.id).order('last_read_at',{ascending:false}).limit(1).maybeSingle():Promise.resolve({data:null})]);
+  if(uR.error)throw uR.error;
+  const un=uR.data||[],ub=ubR.error?[]:(ubR.data||[]),qz=qR.error?[]:(qR.data||[]),pg=pgR.data,byId=new Map(bk.map(b=>[b.id,b]));
+  const cont=pg&&byId.get(pg.book_id),nLan=bk.filter(b=>b.is_launch_active).length,nSoon=bk.filter(b=>!b.published_chapter_count).length,gs=genresOf(bk);
+  const tiles=[
+    ['#/catalogo','book','Todos os livros',pl(bk.length,'livro','livros'),'c1'],
+    ...(nLan?[['#/catalogo?f=lan','spark','Lançamentos',pl(nLan,'novo','novos'),'c2']]:[]),
+    ['#/universos','world','Universos',pl(un.length,'universo','universos'),'c3'],
+    ['#/quizzes','quiz','Quizzes',pl(qz.length,'quiz','quizzes'),'c4'],
+    ...(nSoon?[['#/catalogo?f=brev','soon','Em breve',pl(nSoon,'livro a caminho','livros a caminho'),'c2']]:[]),
+    ...(user?[['#/minha-estante','shelf','Minha estante','Seus livros','c1']]:[]),
+    ['#/sobre','author','A autora','Conheça a Thau Luna','c3'],
+    ['#/blog','blog','Blog','Novidades e bastidores','c4']];
+  const uCard=u=>{const L=ub.filter(x=>x.universe_id===u.id).map(x=>byId.get(x.book_id)).filter(Boolean);
+    return `<a class="duni" href="#/universos/${esc(u.slug)}"><div class="duni-t"><b>${esc(ini(u.name))}</b><span class="mute">${L.length?pl(L.length,'livro','livros'):'Universo'}</span></div><h3>${esc(u.name)}</h3>${u.description?`<p class="clamp">${esc(u.description)}</p>`:''}${L.length?`<div class="stack">${L.slice(0,4).map(b=>`<div class="cover">${coverHtml(b)}</div>`).join('')}</div>`:''}</a>`};
+  const qCard=q=>`<a class="dq" href="#/quiz/${q.id}"><span class="eyebrow">${q.kind==='personality'?'Personalidade':'Conhecimento'}</span><h3>${esc(q.title)}</h3>${q.description?`<p class="clamp">${esc(q.description)}</p>`:''}<span class="dq-f"><span>${esc(q.books?.title||q.universes?.name||"Luna's Library")}</span><em>Responder</em></span></a>`;
+  const contH=cont?`<a class="cont" href="#/livro/${esc(cont.slug)}"><div class="cover">${coverHtml(cont)}</div><div><p class="eyebrow">Continue lendo</p><h3>${esc(cont.title)}</h3>${by(cont)}<div class="pbar" role="progressbar" aria-valuenow="${pg.progress_percent}" aria-valuemin="0" aria-valuemax="100"><i style="width:${pg.progress_percent}%"></i></div></div></a>`:'';
+  app.innerHTML=`${seg('d')}<div class="dhero"><p class="eyebrow">Explore</p><h1>Descobrir</h1><p class="lead">Livros, universos e quizzes num só lugar.</p><form class="dsearch" id="ds" role="search"><label class="sq"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><input name="q" type="search" placeholder="Buscar livros, autores, gêneros" aria-label="Buscar livros"></label><button>Buscar</button></form></div>
+  ${contH}
+  <div class="dsec"><div class="sh"><h2>O que você procura?</h2></div><div class="dtiles">${tiles.map(([h,i,t,s,c])=>`<a class="dt ${c}" href="${h}"><i>${svgI(DI[i])}</i><b>${t}</b><small>${s}</small></a>`).join('')}</div></div>
+  ${gs.length?`<div class="dsec"><div class="sh"><h2>Por gênero</h2></div><div class="gchips">${gs.map(g=>`<a class="gchip" href="#/catalogo?g=${encodeURIComponent(g)}">${esc(g)}</a>`).join('')}</div></div>`:''}
+  ${shelf('Lançamentos',bk.filter(b=>b.is_launch_active),'#/catalogo?f=lan')}
+  <div class="dsec"><div class="sh"><h2>Universos</h2><a class="btn alt sm" href="#/universos">Ver todos</a></div>${un.length?`<div class="dgrid">${un.slice(0,6).map(uCard).join('')}</div>`:state('Nenhum universo cadastrado ainda.')}</div>
+  <div class="dsec"><div class="sh"><h2>Quizzes</h2><a class="btn alt sm" href="#/quizzes">Ver todos</a></div>${qz.length?`<div class="rail">${qz.slice(0,8).map(qCard).join('')}</div>`:state('Nenhum quiz cadastrado ainda.')}</div>
+  ${shelf('Para começar a ler',bk.filter(b=>b.published_chapter_count).slice(0,10),'#/catalogo')}`;
+  document.getElementById('ds').onsubmit=e=>{e.preventDefault();go('/catalogo?q='+encodeURIComponent(e.target.elements.q.value.trim()))};
+}
+
+// ======================= v11: painel admin (menu lateral) =======================
+const ADI={painel:IC.c,pedidos:'M6 2l-2 4v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6l-2-4zM4 6h16M16 10a4 4 0 0 1-8 0',cupons:'M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0L2 12V2h10l8.6 8.6a2 2 0 0 1 0 2.8zM7 7h.01',livros:IC.e,importar:'M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12',trad:DI.world,users:'M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM23 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8',avatar:IC.u,pix:'M3 5h18a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2zM1 10h22',back:'M15 18l-6-6 6-6'};
+const ADMSIDE=[['Visão geral',[['/admin','Painel','painel']]],['Vendas',[['/admin/pedidos','Pedidos','pedidos'],['/admin/cupons','Cupons','cupons']]],['Catálogo',[['/admin/livros','Livros','livros'],['/admin/importar','Importar capítulos','importar'],['/admin/traducoes','Traduções','trad']]],['Comunidade',[['/admin/usuarios','Usuários','users'],['/admin/avatares','Avatares','avatar']]],['Ajustes',[['/admin/configuracoes','Pagamento (Pix)','pix']]]];
+function admShell(path){
+  if(!path.startsWith('/admin')||!isAdmin||app.querySelector('.adm'))return;
+  const act=p=>p==='/admin'?path==='/admin':(path===p||path.startsWith(p+'/'));
+  const side=document.createElement('aside');side.className='adm-side';side.setAttribute('aria-label','Menu da administração');
+  side.innerHTML=ADMSIDE.map(([t,L])=>`<div><h4>${t}</h4>${L.map(([p,n,i])=>`<a href="#${p}"${act(p)?' class="on" aria-current="page"':''}>${svgI(ADI[i])}${n}</a>`).join('')}</div>`).join('')+`<div><a href="#/">${svgI(ADI.back)}Voltar ao site</a></div>`;
+  const main=document.createElement('div');main.className='adm-main';
+  while(app.firstChild)main.appendChild(app.firstChild);
+  const w=document.createElement('div');w.className='adm';w.append(side,main);app.appendChild(w);
+}
+
+// ======================= v11: cupons =======================
+// Banco: rode o arquivo cupons.sql no Supabase (tabelas coupons e coupon_redemptions + funções apply_coupon e remove_coupon).
+// O desconto é aplicado pelo servidor no pedido já criado, na tela de pagamento; o navegador nunca decide o valor.
+Object.assign(ERR,{
+  coupon_invalid:'Cupom inválido ou desativado.',coupon_not_started:'Este cupom ainda não está valendo.',coupon_expired:'Este cupom expirou.',
+  coupon_exhausted:'Este cupom atingiu o limite de usos.',coupon_user_limit:'Você já usou este cupom o máximo de vezes permitido.',
+  coupon_not_applicable:'Este cupom não vale para os livros deste pedido.',coupon_min_order:'O pedido não atinge o valor mínimo deste cupom.',
+  coupon_exceeds_total:'O desconto deste cupom é maior que o valor do pedido.',coupon_already_applied:'Este pedido já tem um cupom aplicado.',
+  proof_already_sent:'O comprovante já foi enviado, então o cupom não pode mais ser alterado.',orders_invalid:'Pedido não encontrado ou já finalizado.',
+  not_authenticated:'Entre na sua conta para usar o cupom.'});
+async function cpInfo(ids){
+  try{const {data,error}=await sb.from('coupon_redemptions').select('order_id,discount_cents,coupon_code').in('order_id',ids);if(error)return null;return data||[]}catch(e){return null}
+}
+const cpBox=(ids,red,canEdit)=>{
+  if(red===null)return '';
+  const j=esc(JSON.stringify(ids));
+  if(red.length){const d=red.reduce((s,x)=>s+x.discount_cents,0);
+    return `<div class="cpn ok"><p><strong>Cupom ${esc(red[0].coupon_code||'')}</strong> aplicado: − ${brl(d)}</p>${canEdit?`<button type="button" class="alt sm" data-a="cprm" data-ids="${j}">Remover cupom</button>`:''}</div>`}
+  if(!canEdit)return '';
+  return `<form class="cpn" data-f="cpapply" data-ids="${j}"><label>Tem um cupom de desconto?<input name="c" maxlength="30" autocapitalize="characters" autocomplete="off" placeholder="Digite o código"></label><button class="alt">Aplicar cupom</button></form>`;
+};
+forms.cpapply=async f=>{
+  const code=f.c.value.trim();if(!code)return toast('Digite o código do cupom.');
+  const {error}=await sb.rpc('apply_coupon',{p_code:code,p_order_ids:JSON.parse(f.dataset.ids)});
+  if(error)return toast(/could not find|schema cache/i.test(error.message)?'Os cupons ainda não estão habilitados no servidor.':(ERR[error.message]||error.message));
+  toast('Cupom aplicado. O valor a pagar foi atualizado.');route();
+};
+actions.cprm=async b=>{
+  const {error}=await sb.rpc('remove_coupon',{p_order_ids:JSON.parse(b.dataset.ids)});if(error)return fail(error);
+  toast('Cupom removido.');route();
+};
+
+const cpMoney=c=>(c/100).toFixed(2).replace('.',',');
+const cpForm=(c,B)=>{
+  const v=c||{},pct=v.discount_type!=='fixed',sel=new Set(v.book_ids||[]);
+  return `<form class="fgrid" data-f="coupon" data-id="${c?esc(c.id):''}">
+  <label>Código<input name="c" required maxlength="30" pattern="[A-Za-z0-9_-]{3,30}" autocapitalize="characters" autocomplete="off" placeholder="Ex.: BEMVINDA10" value="${esc(v.code||'')}"></label>
+  <label>Tipo de desconto<select name="ty"><option value="percent"${pct?' selected':''}>Percentual (%)</option><option value="fixed"${pct?'':' selected'}>Valor fixo (R$)</option></select></label>
+  <label>Valor<input name="v" inputmode="decimal" required placeholder="10 (%) ou 10,00 (R$)" value="${c?(pct?v.discount_value:cpMoney(v.discount_value)):''}"></label>
+  <label>Pedido mínimo (R$, opcional)<input name="mn" inputmode="decimal" placeholder="0,00" value="${v.min_order_cents?cpMoney(v.min_order_cents):''}"></label>
+  <label>Válido a partir de<input name="st" type="datetime-local" value="${loc(v.starts_at)}"></label>
+  <label>Válido até<input name="en" type="datetime-local" value="${loc(v.ends_at)}"></label>
+  <label>Limite total de usos (opcional)<input name="mx" type="number" min="1" inputmode="numeric" value="${v.max_redemptions??''}"></label>
+  <label>Usos por pessoa<input name="mu" type="number" min="1" inputmode="numeric" required value="${v.max_per_user??1}"></label>
+  <label>Descrição interna (opcional)<input name="d" maxlength="120" value="${esc(v.description||'')}"></label>
+  <fieldset class="cpbk"><legend>Livros válidos <span class="mute">(nenhum marcado = todos)</span></legend>${B.map(b=>`<label class="chk"><input type="checkbox" name="bk" value="${esc(b.id)}"${sel.has(b.id)?' checked':''}> ${esc(b.title)}</label>`).join('')}</fieldset>
+  <label class="chk"><input type="checkbox" name="ac"${!c||v.is_active?' checked':''}> Cupom ativo</label>
+  <button>${c?'Salvar cupom':'Criar cupom'}</button></form>`;
+};
+async function adminCupons(){
+  if(!await guard())return;
+  const [cR,rR,bR]=await Promise.all([
+    sb.from('coupons').select('*').order('created_at',{ascending:false}),
+    sb.from('coupon_redemptions').select('coupon_id,batch_id,discount_cents,orders(status)'),
+    sb.from('books').select('id,title').order('sort_order')]);
+  if(cR.error){
+    const miss=/relation|schema cache|does not exist|could not find/i.test(cR.error.message);
+    app.innerHTML=`<div class="adm-h"><div><p class="eyebrow">Vendas</p><h1>Cupons</h1></div></div>${state(miss?'O sistema de cupons ainda não foi instalado no banco. Rode o arquivo <strong>cupons.sql</strong> no SQL Editor do Supabase e recarregue esta página.':esc(cR.error.message),1)}`;return}
+  const B=bR.data||[],titleOf=new Map(B.map(b=>[b.id,b.title])),U={};
+  (rR.data||[]).forEach(r=>{const st=r.orders?.status;if(st!=='pending'&&st!=='paid')return;const u=U[r.coupon_id]=U[r.coupon_id]||{b:new Set(),d:0};u.b.add(r.batch_id);if(st==='paid')u.d+=r.discount_cents});
+  const now=Date.now(),C=cR.data||[];
+  const stat=c=>{const u=U[c.id]?U[c.id].b.size:0;
+    if(!c.is_active)return ['Desativado',''];if(c.ends_at&&new Date(c.ends_at)<now)return ['Expirado',''];
+    if(c.starts_at&&new Date(c.starts_at)>now)return ['Agendado',''];if(c.max_redemptions&&u>=c.max_redemptions)return ['Esgotado',''];return ['Ativo','sun']};
+  const val=c=>c.discount_type==='percent'?`${c.discount_value}%`:brl(c.discount_value);
+  app.innerHTML=`<div class="adm-h"><div><p class="eyebrow">Vendas</p><h1>Cupons</h1></div></div>
+  <p class="mute">O leitor digita o código na tela de pagamento do pedido. O desconto é calculado e gravado pelo servidor; cupons usados ficam no histórico.</p>
+  <details class="acard cp-new"${C.length?'':' open'}><summary>+ Novo cupom</summary>${cpForm(null,B)}</details>
+  <h2>Seus cupons (${C.length})</h2>
+  ${C.length?C.map(c=>{const [sl,sc]=stat(c),u=U[c.id]||{b:new Set(),d:0},n=u.b.size;
+    const scope=c.book_ids&&c.book_ids.length?`${pl(c.book_ids.length,'livro','livros')}: ${c.book_ids.map(i=>esc(titleOf.get(i)||'?')).join(', ')}`:'Todos os livros';
+    const when=[c.starts_at?`desde ${fmt(c.starts_at)}`:'',c.ends_at?`até ${fmt(c.ends_at)}`:''].filter(Boolean).join(' ')||'Sem prazo';
+    const meta=[scope,when,c.min_order_cents?`mínimo ${brl(c.min_order_cents)}`:'',`${n}${c.max_redemptions?` de ${c.max_redemptions}`:''} ${n===1?'uso':'usos'}`,`${c.max_per_user} por pessoa`,u.d?`${brl(u.d)} em descontos confirmados`:''].filter(Boolean).join(' · ');
+    return `<div class="acard"><div class="cp-h"><div><code class="cp-code">${esc(c.code)}</code> <span class="tag ${sc}">${sl}</span>${c.description?`<p class="mute" style="margin:.4rem 0 0">${esc(c.description)}</p>`:''}</div><div class="cp-v">${val(c)}</div></div><p class="mute cp-m">${meta}</p>
+    <div class="row"><button class="alt sm" data-a="cptoggle" data-id="${esc(c.id)}" data-on="${c.is_active?1:0}">${c.is_active?'Desativar':'Ativar'}</button><button class="danger sm" data-a="cpdel" data-id="${esc(c.id)}" data-n="${n}">Excluir</button></div>
+    <details class="cp-e"><summary>Editar cupom</summary>${cpForm(c,B)}</details></div>`}).join(''):state('Nenhum cupom criado ainda.')}`;
+}
+forms.coupon=async f=>{
+  const code=f.c.value.trim().toUpperCase();
+  if(!/^[A-Z0-9_-]{3,30}$/.test(code))return toast('O código deve ter de 3 a 30 letras, números, hífen ou sublinhado.');
+  const ty=f.ty.value;let dv;
+  if(ty==='percent'){dv=parseInt(String(f.v.value).replace(',','.'),10);if(!(dv>=1&&dv<=90))return toast('O percentual deve ficar entre 1 e 90.')}
+  else{dv=cents(f.v.value);if(dv===null||isNaN(dv)||dv<100)return toast('O valor fixo deve ser de pelo menos R$ 1,00.')}
+  const mn=cents(f.mn.value);if(mn!==null&&(isNaN(mn)||mn<0))return toast('Confira o pedido mínimo.');
+  const st=f.st.value?new Date(f.st.value):null,en=f.en.value?new Date(f.en.value):null;
+  if(st&&en&&en<=st)return toast('A data final precisa ser depois da inicial.');
+  const mx=f.mx.value?parseInt(f.mx.value,10):null,mu=parseInt(f.mu.value,10);
+  if(!(mu>=1))return toast('Informe quantos usos por pessoa (mínimo 1).');
+  const bks=[...f.querySelectorAll('input[name=bk]:checked')].map(x=>x.value);
+  const row={code,description:f.d.value.trim()||null,discount_type:ty,discount_value:dv,min_order_cents:mn||0,starts_at:st?st.toISOString():null,ends_at:en?en.toISOString():null,max_redemptions:mx,max_per_user:mu,book_ids:bks.length?bks:null,is_active:f.ac.checked};
+  const id=f.dataset.id;
+  const {error}=id?await sb.from('coupons').update(row).eq('id',id):await sb.from('coupons').insert({...row,created_by:user.id});
+  if(error)return toast(error.code==='23505'?'Já existe um cupom com esse código.':error.message);
+  toast(id?'Cupom salvo.':'Cupom criado.');route();
+};
+actions.cptoggle=async b=>{
+  const {error}=await sb.from('coupons').update({is_active:b.dataset.on!=='1'}).eq('id',b.dataset.id);if(error)return fail(error);
+  toast(b.dataset.on==='1'?'Cupom desativado.':'Cupom ativado.');route();
+};
+actions.cpdel=async b=>{
+  if(+b.dataset.n>0)return toast('Este cupom já foi usado e não pode ser excluído. Desative-o para encerrar o uso.');
+  if(!confirm('Excluir este cupom? Essa ação não pode ser desfeita.'))return;
+  const {error}=await sb.from('coupons').delete().eq('id',b.dataset.id);
+  if(error)return toast(error.code==='23503'?'Este cupom já foi usado e não pode ser excluído. Desative-o.':error.message);
+  toast('Cupom excluído.');route();
+};
+
+const routes=[[/^\/checkout-carrinho$/,checkoutCarrinho],[/^\/sobre$/,sobre],[/^\/blog$/,blog],[/^\/blog\/([^/]+)$/,blogPost],[/^\/politicas$/,legalHub],[/^\/(privacidade|termos|compra|politica-da-comunidade|politica-de-spoilers|direitos-autorais|politica-de-traducoes|politica-de-quizzes|cookies)$/,legalSlug],[/^\/admin\/livros\/([^/]+)$/,adminLivroCaps,1],[/^\/$/,home],[/^\/catalogo$/,catalogo],[/^\/livro\/([^/]+)$/,livro],[/^\/login$/,login],[/^\/cadastro$/,cadastro],[/^\/recuperar$/,recuperar],[/^\/minha-conta$/,conta,1],[/^\/minha-estante$/,estante,1],[/^\/quiz\/([^/]+)$/,quiz],[/^\/universos$/,universos],[/^\/universos\/([^/]+)$/,universo],[/^\/quizzes$/,quizzes],[/^\/ler\/([^/]+)\/(\d+)$/,ler],[/^\/admin$/,admin,1],[/^\/admin\/livros$/,adminLivros,1],[/^\/admin\/pedidos$/,adminPedidos,1],[/^\/admin\/usuarios$/,adminUsuarios,1],[/^\/admin\/configuracoes$/,adminPix,1],[/^\/admin\/importar$/,adminImportar,1],[/^\/admin\/traducoes$/,adminTraducoes,1],[/^\/admin\/avatares$/,adminAvatares,1],[/^\/checkout\/([^/]+)$/,checkout],[/^\/carrinho$/,carrinho],[/^\/configuracoes(?:\/([^/]+))?$/,configuracoes],[/^\/descobrir$/,descobrir],[/^\/admin\/cupons$/,adminCupons,1]];
 async function route(){
   header();onscroll=null;const path=(location.hash.slice(1)||'/').split('?')[0];
   const raw=location.hash.slice(1);
@@ -975,7 +1204,7 @@ async function route(){
   for(const [re,fn,needAuth] of routes){const m=path.match(re);if(!m)continue;
     if(needAuth&&!user)return go('/login');
     app.innerHTML=LOADER;
-    try{await avP;await fn(...m.slice(1))}catch(e){app.innerHTML=state('Não foi possível carregar os dados: '+esc(e.message||e),1)}
+    try{await avP;await fn(...m.slice(1));admShell(path)}catch(e){app.innerHTML=state('Não foi possível carregar os dados: '+esc(e.message||e),1)}
     return}
   app.innerHTML=state('Página não encontrada.');
 }
