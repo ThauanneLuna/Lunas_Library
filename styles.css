@@ -364,3 +364,22 @@ button.qopt[aria-checked=true]{border-color:var(--acc);background:var(--soft);co
 .about-t .about-v{font:italic 500 1.15rem/1.6 var(--serif);color:var(--link);margin:1.4rem 0;padding-top:1rem;border-top:1px solid var(--line)}
 .about-t .about-s{display:grid;gap:.1rem;margin:0 0 1.6rem}.about-s strong{font:600 1.9rem/1.1 var(--serif);color:var(--ink)}.about-s span{color:var(--mute);font-size:.92rem}
 .about-t .row{max-width:none}
+
+/* ===== links de rodapé e de seção viram botões de verdade ===== */
+.fl{gap:.7rem}
+.fl a,.fl a.btn,.fl a.btn.alt,.sh a{display:inline-flex;align-items:center;justify-content:center;min-height:2.6rem;padding:.5rem 1.2rem;margin:0;border-radius:99px;border:1px solid color-mix(in srgb,var(--pink) 55%,var(--line));background:var(--soft);color:var(--soft-ink);font:600 .92rem/1.2 var(--ui);letter-spacing:0;text-transform:none;text-decoration:none;white-space:nowrap;transition:background .2s,color .2s,border-color .2s}
+.fl a::after,.sh a::after{content:none}
+.fl a:hover,.fl a.btn:hover,.fl a.btn.alt:hover,.sh a:hover,.fl a:focus-visible,.sh a:focus-visible{background:var(--acc);color:var(--onacc);border-color:var(--acc)}
+
+/* ===== sobre: foto ao lado do texto ===== */
+@media(max-width:819px){
+  .about{display:block}
+  .about::after{content:"";display:block;clear:both}
+  .about-f{float:left;width:min(36%,160px);margin:.2rem 1rem .6rem 0;position:relative;top:auto;justify-self:auto}
+  .about-f::before{inset:7px -7px -7px 7px;border-radius:16px}
+  .about-f img{border-radius:14px}
+  .about-t h1{font-size:clamp(1.5rem,6.5vw,2rem);margin:.1em 0 .45em}
+  .about-t p{font-size:1rem;line-height:1.7}
+  .about-t .about-v,.about-t .about-s,.about-t .row{clear:both}
+}
+@media(min-width:820px){.about{grid-template-columns:minmax(200px,280px) 1fr;gap:2.2rem}.about-f{width:min(100%,280px)}}
