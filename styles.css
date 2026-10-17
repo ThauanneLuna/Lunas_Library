@@ -383,3 +383,69 @@ button.qopt[aria-checked=true]{border-color:var(--acc);background:var(--soft);co
   .about-t .about-v,.about-t .about-s,.about-t .row{clear:both}
 }
 @media(min-width:820px){.about{grid-template-columns:minmax(200px,280px) 1fr;gap:2.2rem}.about-f{width:min(100%,280px)}}
+
+/* =====================================================================
+   SISTEMA DE BOTÕES v10 — um único padrão para todo o site
+   Variantes:  primário (padrão) · secundário (.alt) · perigo (.danger)
+               texto (.more) · filtro (.chip) · escolha (.opt .avb .qopt) · ícone (.gear .cartlink #menu)
+   Tamanhos:   .sm (40px) · padrão (46px) · .big (54px)
+   Cores:      só da paleta (Raspberry Rose, Blush, Tickle Me Pink) via variáveis dos temas
+   O ":not(#_)" apenas dá prioridade a estas regras sobre as antigas, sem usar !important.
+   ===================================================================== */
+:root{--b-h:46px;--b-hs:40px;--b-hb:54px;--b-ring:color-mix(in srgb,var(--pink) 60%,transparent);--b-softH:color-mix(in srgb,var(--pink) 34%,var(--soft))}
+
+/* --- base de todos os botões --- */
+button:not(#menu),.btn:not(#_){display:inline-flex;align-items:center;justify-content:center;gap:.5rem;min-height:var(--b-h);padding:.6rem 1.5rem;border:1px solid transparent;border-radius:999px;background:var(--acc);color:var(--onacc);font:600 .95rem/1.25 var(--ui);letter-spacing:.01em;text-transform:none;text-align:center;white-space:normal;text-decoration:none;box-shadow:none;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:background .2s,color .2s,border-color .2s,transform .1s}
+button[hidden]:not(#_),.btn[hidden]:not(#_){display:none}
+button:hover:not(#menu),.btn:hover:not(#_){background:var(--accH);color:var(--onacc);border-color:transparent}
+button:active:not(#menu),.btn:active:not(#_){transform:translateY(1px)}
+button:focus-visible:not(#_),.btn:focus-visible:not(#_),.chip:focus-visible:not(#_),.cartlink:focus-visible:not(#_),.gear:focus-visible:not(#_){outline:3px solid var(--b-ring);outline-offset:2px}
+button:disabled:not(#_),.btn[aria-disabled=true]:not(#_){background:var(--panel2);color:var(--mute);border-color:transparent;opacity:.75;cursor:not-allowed;transform:none}
+button svg:not(#_),.btn svg:not(#_){width:1.1em;height:1.1em;flex:none}
+
+/* --- tamanhos --- */
+.btn.sm:not(#_),button.sm:not(#_){min-height:var(--b-hs);padding:.4rem 1.15rem;font-size:.88rem}
+.btn.big:not(#_),button.big:not(#_){min-height:var(--b-hb);padding:.75rem 2rem;font-size:1.02rem}
+
+/* --- secundário: pílula rosada clara, texto em caixa alta espaçada (como "KONTAKT / LES MER") --- */
+button.alt:not(#_),.btn.alt:not(#_),.fl a:not(#_){background:var(--soft);color:var(--soft-ink);border-color:transparent;font-size:.8rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase}
+button.alt:hover:not(#_),.btn.alt:hover:not(#_),.fl a:hover:not(#_){background:var(--b-softH);color:var(--soft-ink);border-color:transparent}
+button.alt.sm:not(#_),.btn.alt.sm:not(#_),.fl a:not(#_){min-height:var(--b-hs);padding:.4rem 1.15rem;font-size:.76rem}
+button.alt.big:not(#_),.btn.alt.big:not(#_){min-height:var(--b-hb);padding:.75rem 2rem;font-size:.86rem}
+button.alt:disabled:not(#_){background:var(--panel2);color:var(--mute)}
+
+/* --- perigo (apagar, recusar): mesma forma do secundário, tom de alerta --- */
+button.danger:not(#_){background:color-mix(in srgb,#b3261e 11%,var(--page));color:#b3261e;border-color:transparent;font-size:.78rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase}
+button.danger:hover:not(#_){background:#b3261e;color:#fff}
+[data-theme=dark] button.danger:not(#_){background:color-mix(in srgb,#F5B7C8 14%,var(--page));color:#F5B7C8}
+[data-theme=dark] button.danger:hover:not(#_){background:#F5B7C8;color:#2A1220}
+
+/* --- texto (ação discreta) --- */
+button.more:not(#_){min-height:var(--b-hs);padding:.3rem .6rem;margin:0;background:transparent;color:var(--link);border-color:transparent;font-size:.9rem;font-weight:600}
+button.more:hover:not(#_){background:var(--soft);color:var(--soft-ink)}
+
+/* --- filtro (.chip): pílula neutra; ativo = rosa claro --- */
+button.chip:not(#_){min-height:var(--b-hs);padding:.3rem 1rem;background:transparent;color:var(--mute);border:1px solid var(--line);font-size:.88rem;font-weight:600;letter-spacing:.01em}
+button.chip:hover:not(#_){background:var(--soft);color:var(--soft-ink);border-color:transparent}
+button.chip[aria-pressed=true]:not(#_){background:var(--soft);color:var(--soft-ink);border-color:var(--pink)}
+
+/* --- escolha (tema, avatar, alternativa do quiz): cartão com a mesma seleção --- */
+button.opt:not(#_),button.avb:not(#_),button.qopt:not(#_){background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:14px;letter-spacing:.01em;text-transform:none}
+button.opt:hover:not(#_),button.avb:hover:not(#_),button.qopt:hover:not(#_){background:var(--soft);color:var(--soft-ink);border-color:var(--pink)}
+button.opt[aria-pressed=true]:not(#_),button.avb[aria-checked=true]:not(#_),button.qopt[aria-checked=true]:not(#_){background:var(--soft);color:var(--soft-ink);border-color:var(--acc);box-shadow:inset 0 0 0 1px var(--acc)}
+button.avb:not(#_){min-height:0;padding:.7rem .3rem;font-size:.74rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase}
+button.qopt:not(#_){justify-content:flex-start;text-align:left;font-size:.98rem;font-weight:500}
+
+/* --- ícone (engrenagem, carrinho, menu): alvo de toque de 44px, círculo --- */
+.gear:not(#_),.cartlink:not(#_),#menu:not(#_){width:44px;height:44px;min-height:0;padding:0;border:1px solid transparent;border-radius:50%;background:transparent;color:var(--mute);place-items:center}
+.gear:hover:not(#_),.cartlink:hover:not(#_),#menu:hover:not(#_),.cartlink.on:not(#_){background:var(--soft);color:var(--soft-ink);border-color:transparent}
+.cbadge:not(#_){background:var(--acc);color:var(--onacc)}
+
+/* secundário sobre fundos rosados (aviso de cookies, "Pagamento confirmado", caixas de destaque): ganha fundo claro e contorno para continuar visível */
+#ckb .alt:not(#_),.paidban .alt:not(#_),.resp .alt:not(#_),.pixwarn .alt:not(#_){background:var(--page);border-color:color-mix(in srgb,var(--pink) 55%,var(--line))}
+#ckb .alt:hover:not(#_),.paidban .alt:hover:not(#_),.resp .alt:hover:not(#_),.pixwarn .alt:hover:not(#_){background:var(--b-softH);border-color:transparent}
+@media (max-width:620px){
+  .btn.big:not(#_),button.big:not(#_){width:100%}
+  .cart-act .btn:not(#_),.cart-act button:not(#_){flex:1 1 auto}
+}
+@media (prefers-reduced-motion:reduce){button:not(#_),.btn:not(#_){transition:none}}
