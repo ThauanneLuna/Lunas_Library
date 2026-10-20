@@ -260,19 +260,18 @@ async function admin(){
     count('payments',q=>q.in('status',['pending','proof_submitted'])),
     count('books'),count('books',q=>q.eq('status','published')),count('profiles'),
     count('coupons',q=>q.eq('is_active',true)).catch(()=>null),
-    sb.from('orders').select('id,amount_cents,status,created_at,paid_at,books(title)').order('created_at',{ascending:false}).limit(500),
+    sb.rpc('admin_dashboard_stats'),
     pixWarn()]);
   if(oR.error)throw oR.error;
-  const O=oR.data||[],paid=O.filter(o=>o.status==='paid'),rev=paid.reduce((s,o)=>s+o.amount_cents,0);
-  let revM=0;
-  paid.forEach(o=>{const k=mk(new Date(o.paid_at||o.created_at)),m=M6.find(x=>x.k===k);if(m)m.v+=o.amount_cents;if(k===mk(now))revM+=o.amount_cents});
+  const ST=oR.data||{},O=ST.recent||[],paid={length:ST.paid_count||0},rev=ST.revenue_cents||0,revM=ST.revenue_month_cents||0;
+  (ST.months||[]).forEach(x=>{const m=M6.find(z=>z.k===x.y+'-'+(x.m-1));if(m)m.v=x.v});
   const mx=Math.max(1,...M6.map(m=>m.v));
-  const top=Object.values(paid.reduce((a,o)=>{const t=o.books?.title||'Livro',r=a[t]=a[t]||{t,n:0,v:0};r.n++;r.v+=o.amount_cents;return a},{})).sort((a,b)=>b.v-a.v).slice(0,5),tmx=Math.max(1,...top.map(x=>x.v));
+  const top=(ST.top||[]).map(x=>({t:x.title,n:x.n,v:x.v})),tmx=Math.max(1,...top.map(x=>x.v));
   const kp=(h,l,v,s,cls)=>{const inner=`<small>${l}</small><b>${v}</b><span>${s}</span>`;return h?`<a class="kpi${cls?' '+cls:''}" href="#${h}">${inner}</a>`:`<div class="kpi${cls?' '+cls:''}">${inner}</div>`};
   const SH=[['/admin/cupons','cupons','Novo cupom'],['/admin/pedidos','pedidos','Conferir pedidos'],['/admin/livros','livros','Livros'],['/admin/importar','importar','Importar capítulos'],['/admin/traducoes','trad','Traduções'],['/admin/usuarios','users','Usuários'],['/admin/avatares','avatar','Avatares'],['/admin/configuracoes','pix','Pagamento (Pix)']];
   app.innerHTML=`${PW}<div class="adm-h"><div><p class="eyebrow">Administração</p><h1>Painel</h1></div><a class="btn" href="#/admin/cupons">Novo cupom</a></div>
   ${pend?`<div class="alertb"><div><strong>${pend} ${pend===1?'pagamento aguarda':'pagamentos aguardam'} conferência.</strong> <span class="mute">Confirme o recebimento do Pix para liberar o acesso.</span></div><a class="btn sm" href="#/admin/pedidos">Conferir agora</a></div>`:''}
-  <div class="kpis">${kp('/admin/pedidos','Receita confirmada',brl(rev),`${paid.length} ${paid.length===1?'pedido pago':'pedidos pagos'}${O.length>=500?' (últimos 500 pedidos)':''}`)}${kp('/admin/pedidos','Receita no mês',brl(revM),now.toLocaleDateString('pt-BR',{month:'long',year:'numeric'}))}${kp('/admin/pedidos','A conferir',pend,pend===1?'pagamento':'pagamentos',pend?'hot':'')}${kp('/admin/livros','Livros',`${nPub}<small style="display:inline;font-size:1rem"> / ${nBk}</small>`,'publicados / total')}${kp('/admin/usuarios','Leitores',nUs,'contas criadas')}${kp('/admin/cupons','Cupons ativos',nCp===null?'—':nCp,nCp===null?'instale o cupons.sql':'em vigor agora')}</div>
+  <div class="kpis">${kp('/admin/pedidos','Receita confirmada',brl(rev),`${paid.length} ${paid.length===1?'pedido pago':'pedidos pagos'}`)}${kp('/admin/pedidos','Receita no mês',brl(revM),now.toLocaleDateString('pt-BR',{month:'long',year:'numeric'}))}${kp('/admin/pedidos','A conferir',pend,pend===1?'pagamento':'pagamentos',pend?'hot':'')}${kp('/admin/livros','Livros',`${nPub}<small style="display:inline;font-size:1rem"> / ${nBk}</small>`,'publicados / total')}${kp('/admin/usuarios','Leitores',nUs,'contas criadas')}${kp('/admin/cupons','Cupons ativos',nCp===null?'—':nCp,nCp===null?'instale o cupons.sql':'em vigor agora')}</div>
   <div class="adm-2"><div class="acard"><h3>Vendas nos últimos 6 meses</h3>${rev?`<div class="chb" role="img" aria-label="Receita confirmada por mês">${M6.map(m=>`<div><em>${m.v?'R$ '+Math.round(m.v/100):''}</em><i style="height:${Math.max(3,Math.round(m.v/mx*120))}px"></i><small>${esc(m.l)}</small></div>`).join('')}</div>`:state('Ainda não há pedidos pagos.')}</div>
   <div class="acard"><h3>Livros mais vendidos</h3>${top.length?`<ul class="toplist">${top.map(x=>`<li><div><span>${esc(x.t)}</span><b>${x.n}× · ${brl(x.v)}</b></div><i style="width:${Math.max(4,Math.round(x.v/tmx*100))}%"></i></li>`).join('')}</ul>`:state('As vendas aparecem aqui.')}</div></div>
   <div class="acard"><h3>Últimos pedidos</h3>${O.length?O.slice(0,6).map(o=>`<div class="orow"><strong>${esc(o.books?.title||'Livro')}</strong><span class="tag">${OS[o.status]||esc(o.status)}</span><span>${brl(o.amount_cents)}</span><span class="mute">${fmt(o.created_at)}</span></div>`).join('')+'<p style="margin:.9rem 0 0"><a class="btn alt sm" href="#/admin/pedidos">Ver todos os pedidos</a></p>':state('Nenhum pedido ainda.')}</div>
@@ -296,21 +295,45 @@ async function adminLivros(){
 }
 const PAYL={pending:'Aguardando pagamento',proof_submitted:'Pagamento informado',confirmed:'Confirmado',rejected:'Recusado',cancelled:'Cancelado'};
 const pixWarn=async()=>{try{const {data}=await sb.from('pix_settings').select('pix_key,copy_paste_code,qr_code_path').maybeSingle();const ok=data&&(data.copy_paste_code||data.pix_key||data.qr_code_path);return ok?'':'<div class="pixwarn"><strong>O Pix ainda não está configurado.</strong> Configure os dados de pagamento antes de aceitar pedidos. <a class="btn alt sm" href="#/admin/configuracoes">Configurar Pix</a></div>'}catch(e){return ''}};
+const PEDQ={tab:'open',q:'',page:0},PED_SIZE=20,PED_TABS=[['open','A conferir'],['rejected','Recusados'],['confirmed','Confirmados'],['all','Todos']];
+const PED_SEL='id,status,amount_cents,created_at,rejected_reason,orders!inner(id,user_id,order_number,group_id,books(title),profiles(display_name))';
+const PED_SEL0='id,status,amount_cents,created_at,rejected_reason,orders!inner(id,user_id,order_number,books(title),profiles(display_name))';
+function pedBase(sel,withCount){
+  let q=sb.from('payments').select(sel,withCount?{count:'exact'}:{}).neq('status','cancelled');
+  if(PEDQ.tab==='open')q=q.in('status',['pending','proof_submitted']);
+  else if(PEDQ.tab==='rejected')q=q.eq('status','rejected');
+  else if(PEDQ.tab==='confirmed')q=q.eq('status','confirmed');
+  const n=parseInt(String(PEDQ.q).replace(/\D/g,''),10);
+  if(PEDQ.q&&!isNaN(n))q=q.eq('orders.order_number',n);
+  return q.order('created_at',{ascending:false});
+}
 async function adminPedidos(){
   if(!await guard())return;
-  const PQ=s=>sb.from('payments').select(s).neq('status','cancelled').order('created_at',{ascending:false}).limit(100);
-  let {data,error}=await PQ('id,status,amount_cents,created_at,rejected_reason,orders(id,user_id,order_number,group_id,books(title),profiles(display_name))');if(error)({data,error}=await PQ('id,status,amount_cents,created_at,rejected_reason,orders(id,user_id,order_number,books(title),profiles(display_name))'));if(error)throw error;
-  let PR={};try{const {data:pp,error:pe}=await sb.from('payments').select('id,proof_path').not('proof_path','is',null);if(!pe&&pp)PR=Object.fromEntries(pp.map(x=>[x.id,x.proof_path]))}catch(e){}
+  const from=PEDQ.page*PED_SIZE;
+  let sel=PED_SEL,{data,error,count}=await pedBase(sel,true).range(from,from+PED_SIZE-1);
+  if(error){sel=PED_SEL0;({data,error,count}=await pedBase(sel,true).range(from,from+PED_SIZE-1))}
+  if(error)throw error;
+  data=data||[];
+  if(!data.length&&PEDQ.page>0){PEDQ.page=0;return adminPedidos()}
+  // pedido em grupo: traz os demais livros do mesmo grupo, mesmo que caiam em outra página
+  const gids=[...new Set(data.map(x=>x.orders?.group_id).filter(Boolean))];
+  if(gids.length){const {data:sib}=await sb.from('payments').select(sel).neq('status','cancelled').in('orders.group_id',gids);const have=new Set(data.map(x=>x.id));(sib||[]).forEach(x=>{if(!have.has(x.id))data.push(x)})}
+  const ids=data.map(x=>x.id),oids=data.map(x=>x.orders?.id).filter(Boolean);
+  let PR={};try{if(ids.length){const {data:pp,error:pe}=await sb.from('payments').select('id,proof_path').in('id',ids).not('proof_path','is',null);if(!pe&&pp)PR=Object.fromEntries(pp.map(x=>[x.id,x.proof_path]))}}catch(e){}
   let BY={};try{const {data:bb,error:be}=await sb.rpc('admin_order_buyers');if(!be&&bb)BY=Object.fromEntries(bb.map(x=>[x.payment_id,x]))}catch(e){}
-  let CR={};try{const {data:cc,error:ce}=await sb.from('coupon_redemptions').select('order_id,discount_cents,coupon_code');if(!ce&&cc)cc.forEach(x=>{CR[x.order_id]=x})}catch(e){}
+  let CR={};try{if(oids.length){const {data:cc,error:ce}=await sb.from('coupon_redemptions').select('order_id,discount_cents,coupon_code').in('order_id',oids);if(!ce&&cc)cc.forEach(x=>{CR[x.order_id]=x})}}catch(e){}
   const cpT=ids=>{const r=ids.map(i=>CR[i]).filter(Boolean);return r.length?` <span class="tag sun">Cupom ${esc(r[0].coupon_code||'')} −${brl(r.reduce((t,x)=>t+x.discount_cents,0))}</span>`:''};
   const PW=await pixWarn();
   const GM={};data.forEach(x=>{const g=x.orders?.group_id;if(g)(GM[g]=GM[g]||[]).push(x)});
   const GH=Object.entries(GM).map(([g,L])=>{const tot=L.reduce((s,x)=>s+x.amount_cents,0),f=L[0],o=f.orders||{},pr=L.map(x=>PR[x.id]).find(Boolean),sts=[...new Set(L.map(x=>x.status))],act=L.some(x=>['pending','proof_submitted'].includes(x.status)),cf=L.some(x=>['pending','proof_submitted','rejected'].includes(x.status));
     return `<div class="box"><span class="tag sun">Pedido em grupo</span> <strong>${L.length} livros</strong> ${brl(tot)}<br><span class="mute">${L.map(x=>esc(x.orders?.books?.title||'Livro')).join(' · ')}</span><br><span class="mute">${esc(BY[f.id]?.buyer_name||o.profiles?.display_name||String(o.user_id||'').slice(0,8))}${BY[f.id]?.buyer_email?` · ${esc(BY[f.id].buyer_email)}`:''} · ${fmt(f.created_at)}</span><br>${sts.map(s=>`<span class="tag">${PAYL[s]}</span>`).join(' ')}${cpT(L.map(x=>x.orders?.id))} ${pr?`<button class="alt sm" data-a="proof" data-p="${esc(pr)}">Ver comprovante</button>`:''}<div class="row">${cf?`<button data-a="gconfirm" data-g="${g}">Confirmar o pedido inteiro</button>`:''}${act?`<button class="alt" data-a="greject" data-g="${g}">Rejeitar</button>`:''}${cf?`<button class="alt" data-a="gcancel" data-g="${g}">Cancelar pedido</button>`:''}</div></div>`}).join('');
-  app.innerHTML=`${PW}<h1>Pedidos e pagamentos</h1><p class="mute">Confira o recebimento do Pix antes de confirmar. Confirmar libera o acesso ao livro.</p>${GH}${data.length?data.filter(x=>!x.orders?.group_id).map(x=>{const o=x.orders||{};return `<div class="box"><strong>${esc(o.books?.title||'Livro')}</strong> ${brl(x.amount_cents)} <span class="mute">Pedido ${ordN(o.order_number)}</span><br><span class="mute">${esc(BY[x.id]?.buyer_name||o.profiles?.display_name||String(o.user_id||'').slice(0,8))}${BY[x.id]?.buyer_email?` · ${esc(BY[x.id].buyer_email)}`:''} · ${fmt(x.created_at)}</span><br><span class="tag">${PAYL[x.status]}</span>${cpT([o.id])} ${PR[x.id]?`<button class="alt sm" data-a="proof" data-p="${esc(PR[x.id])}">Ver comprovante</button>`:(x.status==='proof_submitted'?'<span class="mute">sem comprovante anexado</span>':'')}${x.rejected_reason?` <span class="mute">${esc(x.rejected_reason)}</span>`:''}
-  <div class="row">${['pending','proof_submitted','rejected'].includes(x.status)?`<button data-a="confirm" data-id="${x.id}">Confirmar pagamento</button>`:''}${['pending','proof_submitted'].includes(x.status)?`<button class="alt" data-a="reject" data-id="${x.id}">Rejeitar</button>`:''}${['pending','proof_submitted','rejected'].includes(x.status)?`<button class="alt" data-a="cancelorder" data-id="${x.id}">Cancelar pedido</button>`:''}</div></div>`}).join(''):state('Nenhum pedido ainda.')}`;
+  const total=count??data.length,pages=Math.max(1,Math.ceil(total/PED_SIZE));
+  const bar=`<div class="chips" role="group" aria-label="Filtrar pedidos">${PED_TABS.map(([k,l])=>`<button type="button" class="chip" aria-pressed="${PEDQ.tab===k}" data-a="pedtab" data-t="${k}">${l}</button>`).join('')}</div><form data-f="pedsearch" class="row" role="search"><input name="q" type="search" inputmode="numeric" placeholder="Nº do pedido" aria-label="Buscar pelo número do pedido" value="${esc(PEDQ.q)}"><button class="alt sm">Buscar</button>${PEDQ.q?'<button type="button" class="alt sm" data-a="pedclear">Limpar</button>':''}<button type="button" class="alt sm" data-a="pedexport">Exportar CSV</button></form>`;
+  const pg=`<p class="row">${PEDQ.page>0?'<button type="button" class="alt sm" data-a="pedpage" data-d="-1">← Anteriores</button>':''}<span class="mute">Página ${PEDQ.page+1} de ${pages} · ${total} ${total===1?'pagamento':'pagamentos'}</span>${PEDQ.page+1<pages?'<button type="button" class="alt sm" data-a="pedpage" data-d="1">Próximos →</button>':''}</p>`;
+  app.innerHTML=`${PW}<h1>Pedidos e pagamentos</h1><p class="mute">Confira o recebimento do Pix antes de confirmar. Confirmar libera o acesso ao livro.</p>${bar}${GH}${data.length?data.filter(x=>!x.orders?.group_id).map(x=>{const o=x.orders||{};return `<div class="box"><strong>${esc(o.books?.title||'Livro')}</strong> ${brl(x.amount_cents)} <span class="mute">Pedido ${ordN(o.order_number)}</span><br><span class="mute">${esc(BY[x.id]?.buyer_name||o.profiles?.display_name||String(o.user_id||'').slice(0,8))}${BY[x.id]?.buyer_email?` · ${esc(BY[x.id].buyer_email)}`:''} · ${fmt(x.created_at)}</span><br><span class="tag">${PAYL[x.status]}</span>${cpT([o.id])} ${PR[x.id]?`<button class="alt sm" data-a="proof" data-p="${esc(PR[x.id])}">Ver comprovante</button>`:(x.status==='proof_submitted'?'<span class="mute">sem comprovante anexado</span>':'')}${x.rejected_reason?` <span class="mute">${esc(x.rejected_reason)}</span>`:''}
+  <div class="row">${['pending','proof_submitted','rejected'].includes(x.status)?`<button data-a="confirm" data-id="${x.id}">Confirmar pagamento</button>`:''}${['pending','proof_submitted'].includes(x.status)?`<button class="alt" data-a="reject" data-id="${x.id}">Rejeitar</button>`:''}${['pending','proof_submitted','rejected'].includes(x.status)?`<button class="alt" data-a="cancelorder" data-id="${x.id}">Cancelar pedido</button>`:''}</div></div>`}).join(''):state(PEDQ.q?'Nenhum pedido com esse número.':'Nenhum pedido neste filtro.')}${pg}`;
 }
+
 async function adminUsuarios(){
   if(!await guard())return;
   const [{data:pr,error},{data:ro},{data:en},{data:bk}]=await Promise.all([sb.from('profiles').select('id,display_name,avatar_path').order('created_at').limit(200),sb.from('user_roles').select('user_id,role'),sb.from('book_entitlements').select('user_id,book_id,status,books(title)'),sb.from('books').select('id,title').order('sort_order')]);
@@ -603,8 +626,6 @@ async function quiz(id){
   if(!qs.length){app.innerHTML=head+state('Este quiz ainda não tem perguntas.');return}
   const N=qs.length,pers=q.kind==='personality';let i=0,A={};
   const draw=()=>{
-    if(!user){app.innerHTML=`${head}${q.description?`<p>${esc(q.description)}</p>`:''}<div class="box"><p>Entre na sua conta para responder.</p><p class="row"><button id="qlogin">Entrar para responder</button></p></div>`;
-      document.getElementById('qlogin').onclick=()=>{sessionStorage.setItem('ll-next','/quiz/'+id);go('/login')};return}
     const x=qs[i],sel=A[x.id];
     app.innerHTML=`${head}<div class="qprog"><span>Pergunta ${i+1} de ${N}</span><div class="pbar" role="progressbar" aria-valuemin="1" aria-valuemax="${N}" aria-valuenow="${i+1}"><i style="width:${(i+1)/N*100}%"></i></div></div><div class="box qcard"><h2 class="qp">${esc(x.prompt)}</h2><div class="qopts" role="radiogroup" aria-label="Alternativas">${[...x.quiz_options].sort((a,b)=>a.position-b.position).map(o=>`<button type="button" class="qopt" role="radio" aria-checked="${o.id===sel}" data-o="${o.id}">${esc(o.label)}</button>`).join('')}</div><p class="row">${i?'<button type="button" class="alt" id="qprev">Voltar</button>':''}<button type="button" id="qnext"${sel?'':' disabled'}>${i===N-1?'Ver resultado':'Próxima'}</button></p><p class="mute" id="qerr" role="alert"></p></div>`;
     const nx=document.getElementById('qnext');
@@ -614,9 +635,10 @@ async function quiz(id){
       if(!A[x.id])return;
       if(i<N-1){i++;draw();window.scrollTo(0,0);return}
       nx.disabled=true;nx.textContent='Calculando…';
-      const {data,error}=await sb.rpc(pers?'submit_personality_quiz':'submit_quiz_attempt',{p_quiz_id:id,p_answers:A});
+      const {data,error}=await sb.rpc(pers?'submit_personality_quiz':'grade_quiz',{p_quiz_id:id,p_answers:A});
+      if(!error&&data&&!pers&&user)sb.rpc('submit_quiz_attempt',{p_quiz_id:id,p_answers:A}).then(()=>{},()=>{}); // quem está logado também guarda a pontuação na conta
       if(error||!data){nx.disabled=false;nx.textContent='Ver resultado';document.getElementById('qerr').textContent='Não foi possível enviar suas respostas agora. Tente novamente.';return}
-      app.innerHTML=`${head}<div class="box qres"><p class="eyebrow">${pers?'Seu resultado':'Resultado'}</p>${pers?`<h2>Você é ${esc(data.name)}!</h2><p class="qdesc">${esc(data.description)}</p>`:`<h2>${data.score} de ${data.max_score}</h2><p class="qdesc">Você acertou ${data.score} de ${data.max_score} perguntas.</p>`}<p class="row"><button id="qredo">Refazer o quiz</button><a class="btn alt" href="#/quizzes">Ver outros quizzes</a></p></div>`;
+      app.innerHTML=`${head}<div class="box qres"><p class="eyebrow">${pers?'Seu resultado':'Resultado'}</p>${pers?`<h2>Você é ${esc(data.name)}!</h2><p class="qdesc">${esc(data.description)}</p>`:`<h2>${data.score} de ${data.max_score}</h2><p class="qdesc">Você acertou ${data.score} de ${data.max_score} perguntas.</p>${data.result?`<p class="qdesc"><strong>${esc(data.result.title)}</strong>${data.result.description?` — ${esc(data.result.description)}`:''}</p>`:''}`}<p class="row"><button id="qredo">Refazer o quiz</button><a class="btn alt" href="#/quizzes">Ver outros quizzes</a></p></div>`;
       document.getElementById('qredo').onclick=()=>{A={};i=0;draw();window.scrollTo(0,0)};window.scrollTo(0,0)};
   };
   draw();
@@ -641,6 +663,17 @@ const actions={
   confirm:async b=>{if(!confirm('Confirmar este pagamento e liberar o acesso ao livro?'))return;const {error}=await sb.rpc('admin_confirm_payment',{p_payment_id:b.dataset.id});if(error)return fail(error);toast('Pagamento confirmado.');route()},
   cartadd:async b=>{await cartAdd(b.dataset.id);toast('Livro adicionado ao carrinho.');route()},
   cartrm:async b=>{await cartRemove(b.dataset.id);toast('Livro removido do carrinho.');route()},
+  pedtab:b=>{PEDQ.tab=b.dataset.t;PEDQ.page=0;route()},
+  pedpage:b=>{PEDQ.page=Math.max(0,PEDQ.page+(+b.dataset.d));route()},
+  pedclear:()=>{PEDQ.q='';PEDQ.page=0;route()},
+  pedexport:async()=>{
+    const rows=[];for(let f=0;;f+=500){const {data,error}=await pedBase(PED_SEL0,false).range(f,f+499);if(error)return fail(error);rows.push(...(data||[]));if(!data||data.length<500)break}
+    if(!rows.length)return toast('Não há pedidos para exportar neste filtro.');
+    let BYx={};try{const {data:bb}=await sb.rpc('admin_order_buyers');(bb||[]).forEach(x=>{BYx[x.payment_id]=x})}catch(e){}
+    let CRx={};try{const {data:cc}=await sb.from('coupon_redemptions').select('order_id,discount_cents,coupon_code');(cc||[]).forEach(x=>{CRx[x.order_id]=x})}catch(e){}
+    const cell=v=>{let t=String(v??'');if(/^[=+\-@\t\r]/.test(t))t="'"+t;return '"'+t.replace(/"/g,'""')+'"'},rs=c=>(c/100).toFixed(2).replace('.',',');
+    const L=[['Pedido','Data','Comprador','E-mail','Livro','Valor (R$)','Status','Cupom','Desconto (R$)'],...rows.map(x=>{const o=x.orders||{},c=CRx[o.id],by=BYx[x.id]||{};return [o.order_number,new Date(x.created_at).toLocaleString('pt-BR'),by.buyer_name||o.profiles?.display_name||'',by.buyer_email||'',o.books?.title||'',rs(x.amount_cents),PAYL[x.status]||x.status,c?c.coupon_code:'',c?rs(c.discount_cents):'']})].map(r=>r.map(cell).join(';'));
+    const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+L.join('\r\n')],{type:'text/csv;charset=utf-8'}));a.download='pedidos-luna.csv';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),3000);toast(`${rows.length} ${rows.length===1?'pagamento exportado':'pagamentos exportados'}.`)},
   cancelorder:async b=>{if(!confirm('Cancelar este pedido? Ele deixará de aparecer na lista e o livro não será liberado.'))return;const {error}=await sb.rpc('admin_cancel_pending_order',{p_payment_id:b.dataset.id});if(error)return fail(error);toast('Pedido cancelado.');route()},
   reject:async b=>{const r=prompt('Motivo da recusa (opcional):');if(r===null)return;const {error}=await sb.rpc('admin_reject_payment',{p_payment_id:b.dataset.id,p_reason:r||null});if(error)return fail(error);toast('Pagamento recusado.');route()},
   revoke:async b=>{if(!confirm('Revogar o acesso deste usuário ao livro?'))return;const {error}=await sb.rpc('admin_revoke_access',{p_user_id:b.dataset.u,p_book_id:b.dataset.b});if(error)return fail(error);toast('Acesso revogado.');route()},
@@ -694,6 +727,7 @@ const actions={
   del:async b=>{if(!confirm('Excluir esta publicação?'))return;const {error}=await sb.from('posts').delete().eq('id',b.dataset.id);error?fail(error):route()}
 };
 const forms={
+  pedsearch:async f=>{PEDQ.q=f.q.value.trim();PEDQ.page=0;route()},
   chemail:async f=>{const e=f.e.value.trim();if(!e)return;if(e.toLowerCase()===String(user.email||'').toLowerCase())return toast('Esse já é o seu e-mail atual.');
     const {error}=await sb.auth.updateUser({email:e},{emailRedirectTo:location.href.split('#')[0]});if(error)return fail(error);
     f.reset();toast('Enviamos um link de confirmação. O e-mail só muda depois que você confirmar.')},
@@ -742,7 +776,7 @@ document.addEventListener('submit',async e=>{const f=e.target,h=forms[f.dataset.
 const LOADER='<div aria-busy="true" aria-label="Carregando"><div class="skel" style="width:45%;height:2.4rem;margin-bottom:1.2rem"></div><div class="grid">'+'<div class="skel" style="aspect-ratio:2/3;height:auto"></div>'.repeat(3)+'</div></div>';
 // ---- roteador (hash, funciona em hospedagem estática) ----
 // ---- páginas institucionais (texto fixo; contato real informado pela administração) ----
-const CONTATO='Thauluna.acessorios@gmail.com',LEGAL_UPD='9 de outubro de 2026',INSTAGRAM_URL='https://www.instagram.com/thauluna_studio/',INSTAGRAM_USER='@thauluna_studio';
+const CONTATO='Thauluna.studio@gmail.com',LEGAL_UPD='9 de outubro de 2026',INSTAGRAM_URL='https://www.instagram.com/lunaslibraryapp/',INSTAGRAM_USER='@lunaslibraryapp';
 // Enquanto os textos aguardam revisão jurídica, mostra o aviso "em revisão" no topo de cada página. Mude para false só depois da validação.
 const LEGAL_EM_REVISAO=true;
 const LEGAL_DOCS=[
@@ -765,7 +799,7 @@ function legal(k){
   const ctt=`<h2>Contato</h2><p>O e-mail é o canal de contato preferencial: ${mail}.${INSTAGRAM_URL?` Para contato geral, você também pode usar o <a href="${INSTAGRAM_URL}" target="_blank" rel="noopener">Instagram oficial da Thau Luna Studio (${INSTAGRAM_USER})</a>.`:''}</p>`;
   const P={
   p:['Política de Privacidade',`<p>Esta política explica quais dados a Luna's Library usa e por quê. A Luna's Library é uma extensão da Thau Luna Studio, que é responsável pelo tratamento dos dados na plataforma. Para qualquer solicitação sobre privacidade, escreva para ${mail}.</p>
-<h2>Dados que a plataforma guarda</h2><ul><li><strong>Conta:</strong> e-mail, nome de exibição, avatar escolhido e preferência de tema. Se você entrar com o Google, o serviço de autenticação recebe do Google os dados básicos de perfil que o Google compartilhar (como e-mail e nome). A senha é tratada pelo serviço de autenticação e não fica visível para a administração.</li><li><strong>Leitura:</strong> o progresso de leitura dos livros a que você tem acesso, incluindo o capítulo e o idioma em que você estava lendo.</li><li><strong>Pedidos e pagamentos:</strong> livro, valor, número, data e status do pedido, o comprovante de Pix que você enviar (que pode conter dados do pagador, como nome, valor, data e horário, conforme o seu banco) e, se houver, o motivo da recusa do pagamento. Coletamos apenas o necessário para confirmar o pagamento e, se for o caso, devolver o valor. Só pediremos informações adicionais, por exemplo se o Pix sair da conta de outra pessoa, quando forem realmente necessárias para verificar o pagamento ou processar uma devolução.</li><li><strong>Comunidade e opiniões:</strong> publicações, comentários, curtidas e opiniões sobre livros. Seu nome de exibição, seu avatar e o que você publica ficam visíveis para outros leitores.</li><li><strong>Quizzes:</strong> as respostas enviadas e o resultado ou a pontuação.</li><li><strong>Dados técnicos:</strong> os serviços de hospedagem e de infraestrutura que fazem a plataforma funcionar podem registrar dados técnicos de acesso, como endereço IP e tipo de navegador.</li></ul>
+<h2>Dados que a plataforma guarda</h2><ul><li><strong>Conta:</strong> e-mail, nome de exibição, avatar escolhido e preferência de tema. Se você entrar com o Google, o serviço de autenticação recebe do Google os dados básicos de perfil que o Google compartilhar (como e-mail e nome). A senha é tratada pelo serviço de autenticação e não fica visível para a administração.</li><li><strong>Leitura:</strong> o progresso de leitura dos livros a que você tem acesso, incluindo o capítulo e o idioma em que você estava lendo.</li><li><strong>Pedidos e pagamentos:</strong> livro, valor, número, data e status do pedido, o comprovante de Pix que você enviar (que pode conter dados do pagador, como nome, valor, data e horário, conforme o seu banco) e, se houver, o motivo da recusa do pagamento. Coletamos apenas o necessário para confirmar o pagamento e, se for o caso, devolver o valor. Só pediremos informações adicionais, por exemplo se o Pix sair da conta de outra pessoa, quando forem realmente necessárias para verificar o pagamento ou processar uma devolução.</li><li><strong>Comunidade e opiniões:</strong> publicações, comentários, curtidas e opiniões sobre livros. Seu nome de exibição, seu avatar e o que você publica ficam visíveis para outros leitores.</li><li><strong>Quizzes:</strong> os quizzes podem ser respondidos sem login. Quem está logado e responde um quiz de conhecimento tem as respostas e a pontuação guardadas na conta. Quizzes de personalidade e quizzes respondidos sem login não guardam as respostas.</li><li><strong>Dados técnicos:</strong> os serviços de hospedagem e de infraestrutura que fazem a plataforma funcionar podem registrar dados técnicos de acesso, como endereço IP e tipo de navegador.</li></ul>
 <h2>Para que usamos</h2><p>Para criar e manter sua conta, liberar o acesso aos livros, conferir pagamentos, enviar por e-mail as instruções do pedido, guardar seu progresso e permitir sua participação na comunidade e nos quizzes. Também para manter a plataforma segura e cumprir obrigações legais. Não vendemos seus dados.</p>
 <h2>Pagamentos</h2><p>O pagamento é feito por Pix, fora do site, pelo aplicativo do seu banco. As instruções de pagamento são enviadas para o seu e-mail. A plataforma não recebe nem guarda dados de cartão e não acessa sua conta bancária. O comprovante que você enviar é usado para conferir o pagamento, mas não confirma o pagamento por si só: a confirmação acontece quando conferimos a entrada do valor.</p>
 <h2>Serviços que fazem a plataforma funcionar</h2><ul><li><strong>Supabase:</strong> banco de dados, autenticação, armazenamento de arquivos (como comprovantes) e funções de servidor.</li><li><strong>Login com Google:</strong> opcional, para quem escolher entrar com a conta Google.</li><li><strong>Serviço de envio de e-mail:</strong> envia as instruções do pedido e outras mensagens da conta.</li><li><strong>GitHub Pages:</strong> hospedagem do site.</li><li><strong>jsDelivr e Google Fonts:</strong> carregam uma biblioteca do site e as fontes. Ao carregar esses itens, seu navegador se conecta a esses serviços, que podem receber dados técnicos, como o endereço IP.</li></ul><p>Alguns desses serviços podem processar dados em servidores fora do Brasil. Hoje, a plataforma não usa ferramentas de análise de audiência, de publicidade ou de rastreamento. O que o site guarda no seu navegador, e como escolher, está na <a href="#/cookies">página de Cookies e Armazenamento</a>.</p>
@@ -833,7 +867,7 @@ function legal(k){
 <h2>Resultado de personalidade não é diagnóstico</h2><p>O resultado de um quiz de personalidade é uma brincadeira baseada nas suas respostas. Não é diagnóstico psicológico nem avaliação profissional e não deve ser usado para decisões sérias. Se precisar de orientação sobre saúde mental, procure um profissional habilitado.</p>
 <h2>Seu acesso aos livros</h2><p>Responder um quiz, acertar, errar ou receber um resultado não altera o seu acesso aos livros, a sua biblioteca nem as suas compras.</p>
 <h2>Spoilers</h2><p>Quizzes sobre os livros podem conter spoilers.</p>
-<h2>Dados dos quizzes</h2><p>Usamos suas respostas para calcular o resultado, e as respostas enviadas e o resultado ou a pontuação ficam guardados. Veja a <a href="#/privacidade">Política de Privacidade</a>.</p>
+<h2>Dados dos quizzes</h2><p>Você pode responder aos quizzes sem fazer login. Usamos as respostas apenas para calcular o resultado. Se você estiver logado e responder um quiz de conhecimento, as respostas e a pontuação ficam guardadas na sua conta. Os quizzes de personalidade e os respondidos sem login não guardam as suas respostas. Veja a <a href="#/privacidade">Política de Privacidade</a>.</p>
 <h2>Personagens e obras</h2><p>Os personagens, nomes e histórias citados nos quizzes pertencem aos seus autores e titulares. Veja a <a href="#/direitos-autorais">Política de Direitos Autorais e Conteúdo</a>.</p>
 <h2>Erros e sugestões</h2><p>Se encontrar pergunta com erro ou problema em um quiz, avise pelo contato abaixo.</p>${ctt}`],
   k:['Cookies e Armazenamento',`<p>Esta página descreve o que a Luna's Library guarda no seu navegador. O site usa o armazenamento local do navegador (localStorage e sessionStorage) e não grava cookies próprios.</p>
