@@ -619,3 +619,34 @@ a.kpi:hover{transform:translateY(-2px);color:var(--ink)}
 .cpn{margin:1rem 0;padding:1rem 1.2rem;border-radius:12px;background:var(--soft);color:var(--soft-ink);max-width:none}
 .cpn label{color:inherit}.cpn p{margin:0}
 .cpn.ok{display:flex;gap:.8rem 1rem;align-items:center;justify-content:space-between;flex-wrap:wrap}
+
+/* ===== botões de verdade (sem caixa alta, sem seta, sem contorno) ===== */
+.sh a,.fl a,.lnav a{text-transform:none;letter-spacing:0}
+.sh a::after,.fl a::after,a.btn::after{content:none!important}
+.sh a{display:inline-flex;align-items:center;min-height:40px;margin:0;padding:.4rem 1.15rem;border-radius:999px;background:var(--soft);color:var(--soft-ink);border:0;font:600 .92rem var(--ui);text-decoration:none}
+.sh a:hover{background:var(--acc);color:var(--onacc)}
+a.btn.alt,button.alt{background:var(--soft);color:var(--soft-ink);border:1px solid transparent;text-transform:none;letter-spacing:0}
+a.btn.alt:hover,button.alt:hover{background:var(--acc);color:var(--onacc)}
+
+/* ===== sobre a autora: foto pequena ao lado do texto ===== */
+.about{display:block;max-width:980px;margin:0 auto}
+.about-f{float:left;width:clamp(104px,30vw,150px);margin:.3rem 1rem .6rem 0;position:relative;justify-self:auto}
+.about-f::before{inset:7px -7px -7px 7px;border-radius:18px}
+.about-f img{aspect-ratio:3/4;border-radius:16px;object-position:50% 18%}
+.about-t .eyebrow{margin-top:.2rem}.about-t h1{font-size:clamp(1.7rem,6vw,3rem)}.about-t .row{clear:both}
+@media(min-width:780px){.about{display:grid;grid-template-columns:230px 1fr;gap:2.4rem;align-items:start}.about-f{float:none;width:100%;margin:0;position:sticky;top:5rem}.about-t h1{font-size:clamp(2.1rem,4vw,3.2rem)}.about-t .row{clear:none}}
+
+/* ===== cupom no carrinho, aviso de boas-vindas, como funciona, dúvidas ===== */
+.cp-cart{margin:.9rem 0;display:grid;gap:.5rem}.cp-cart label{font-weight:600}.cp-cart .row{flex-wrap:nowrap}.cp-cart input{flex:1;min-width:0;text-transform:uppercase}
+.wm{position:fixed;inset:0;z-index:60;display:grid;place-items:center;padding:1rem;background:rgba(30,10,22,.55);backdrop-filter:blur(3px)}
+.wm-c{position:relative;width:min(100%,420px);background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:24px;padding:1.7rem 1.4rem 1.4rem;text-align:center;box-shadow:var(--sh)}
+.wm-c h2{font-size:1.7rem;margin:.2rem 0 .5rem;color:var(--link)}.wm-c .row{justify-content:center}
+.wm-code{display:inline-block;margin:.6rem 0 1rem;padding:.55rem 1.1rem;border-radius:14px;background:var(--soft);color:var(--soft-ink);font:700 1.3rem var(--ui);letter-spacing:.12em}
+.wm-x{position:absolute;top:.7rem;right:.7rem;width:2.2rem;height:2.2rem;min-height:0;padding:0;border-radius:50%;font-size:1.3rem;line-height:1}
+.how{margin:2.4rem 0 .5rem}.how-l{list-style:none;margin:1rem 0 0;padding:0;display:grid;gap:.9rem}
+@media(min-width:780px){.how-l{grid-template-columns:repeat(3,1fr)}}
+.how-l li{display:grid;gap:.3rem;align-content:start;padding:1.1rem 1.2rem;border-radius:18px;background:var(--soft);color:var(--soft-ink)}
+.how-l b{font:600 1.15rem var(--serif)}.how-l span{font-size:.95rem;line-height:1.55}
+.faq details{border-bottom:1px solid var(--line);padding:.9rem 0}.faq summary{cursor:pointer;font:600 1.05rem var(--ui);list-style:none}
+.faq summary::-webkit-details-marker{display:none}.faq summary::after{content:"+";float:right;color:var(--link)}
+.faq details[open] summary::after{content:"−"}.faq p{margin:.6rem 0 0;color:var(--mute)}

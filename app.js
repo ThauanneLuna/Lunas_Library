@@ -1005,10 +1005,13 @@ async function carrinho(){
   if(!items.length){app.innerHTML=`<div class="cart"><h1>Carrinho</h1>${nt}${state('Seu carrinho está vazio.')}<p class="row" style="justify-content:center;margin-top:1rem"><a class="btn" href="#/catalogo">Ver o catálogo</a></p></div>`;return}
   const S=cartSummary(items),n=items.length;
   const rows=items.map(({b,pend})=>`<li class="cart-it"><a class="cart-cv" href="#/livro/${esc(b.slug)}" aria-label="${esc(b.title)}"><div class="cover">${coverHtml(b)}</div></a><div class="cart-info"><a class="cart-t" href="#/livro/${esc(b.slug)}">${esc(b.title)}</a>${by(b)}<div class="cart-p">${priceHtml(b)}</div>${pend?`<div><span class="tag">Pedido ${ordN(pend)} aguardando pagamento</span></div>`:''}</div><div class="cart-act">${pend?`<a class="btn alt sm" href="#/checkout/${esc(b.slug)}">Ver pagamento</a>`:`<a class="btn sm" href="#/checkout/${esc(b.slug)}">Comprar este livro</a>`}<button class="alt sm" data-a="cartrm" data-id="${esc(b.id)}">Remover</button></div></li>`).join('');
+  const CP=await cpPreview(S);if(CP.ok){S.discount=CP.discount;S.total=Math.max(0,S.subtotal-CP.discount)}
   let cta='';
-  if(S.count===1)cta=`<a class="btn big" href="#/checkout/${esc(S.pay[0].b.slug)}">Finalizar compra</a>`;
+  if(S.count>CART_MAX)cta=`<p class="state bad">O limite é de ${CART_MAX} livros por compra. Remova alguns para finalizar.</p>`;
+  else if(S.count>=1)cta='<a class="btn big" href="#/checkout-carrinho">Finalizar compra</a><p class="mute"><small>Um único Pix e um único comprovante para o carrinho inteiro.</small></p>';
+  else if(false)cta=`<a class="btn big" href="#/checkout/${esc(S.pay[0].b.slug)}">Finalizar compra</a>`;
   else if(S.count>1)cta=S.count>CART_MAX?`<p class="state bad">O limite é de ${CART_MAX} livros por compra. Remova alguns para finalizar.</p>`:'<a class="btn big" href="#/checkout-carrinho">Finalizar compra com um único Pix</a><p class="mute"><small>Um Pix e um comprovante para o carrinho inteiro. Ou compre um livro de cada vez em “Comprar este livro”.</small></p>';
-  app.innerHTML=`<div class="cart"><h1>Carrinho</h1><p class="mute">${n} ${n===1?'livro':'livros'}</p>${nt}<div class="cart-grid"><ul class="cart-list">${rows}</ul><aside class="box cart-sum" aria-label="Resumo do carrinho"><h2>Resumo</h2><dl><div><dt>Livros a pagar</dt><dd>${S.count}</dd></div><div><dt>Subtotal</dt><dd>${brl(S.subtotal)}</dd></div>${S.discount?`<div><dt>Desconto</dt><dd>−${brl(S.discount)}</dd></div>`:''}<div class="tot"><dt>Total</dt><dd>${brl(S.total)}</dd></div></dl>${cta}${user?'':'<p class="mute"><small>Seu carrinho fica salvo neste aparelho. Ao entrar na sua conta, ele passa para ela.</small></p>'}<p class="mute"><small>O valor final é confirmado quando o pedido é criado. O livro só é liberado depois que a administração confirmar o pagamento.</small></p></aside></div></div>`;
+  app.innerHTML=`<div class="cart"><h1>Carrinho</h1><p class="mute">${n} ${n===1?'livro':'livros'}</p>${nt}<div class="cart-grid"><ul class="cart-list">${rows}</ul><aside class="box cart-sum" aria-label="Resumo do carrinho"><h2>Resumo</h2><dl><div><dt>Livros a pagar</dt><dd>${S.count}</dd></div><div><dt>Subtotal</dt><dd>${brl(S.subtotal)}</dd></div>${S.discount?`<div><dt>Desconto</dt><dd>−${brl(S.discount)}</dd></div>`:''}<div class="tot"><dt>Total</dt><dd>${brl(S.total)}</dd></div></dl>${cpCartBox(CP)}${cta}${user?'':'<p class="mute"><small>Seu carrinho fica salvo neste aparelho. Ao entrar na sua conta, ele passa para ela.</small></p>'}<p class="mute"><small>O valor final é confirmado quando o pedido é criado. O livro só é liberado depois que a administração confirmar o pagamento.</small></p></aside></div>${comoFunciona()}</div>`;
 }
 
 // ---- checkout do carrinho: um pedido em grupo, um Pix, um comprovante (usa o carrinho v9 existente) ----
@@ -1020,7 +1023,7 @@ async function grpLoad(){
   const items=(bk.data||[]).filter(b=>!owned.has(b.id)&&b.status==='published'&&b.is_purchasable).map(b=>({b,pend:pend.has(b.id)}));
   return {S:cartSummary(items),pend:items.filter(x=>x.pend).map(x=>x.b)};
 }
-const grpRows=(n,sub,tot)=>`<div class="ckrows"><div><span>Livros</span><span>${n}</span></div><div><span>Subtotal</span><span>${brl(sub)}</span></div><div class="tot"><span>Total</span><span>${brl(tot)}</span></div></div>`;
+const grpRows=(n,sub,tot,disc)=>`<div class="ckrows"><div><span>Livros</span><span>${n}</span></div><div><span>Subtotal</span><span>${brl(sub)}</span></div>${disc?`<div><span>Desconto</span><span>−${brl(disc)}</span></div>`:''}<div class="tot"><span>Total</span><span>${brl(tot)}</span></div></div>`;
 async function checkoutCarrinho(){
   await roleP;const H='<div class="ck"><h1>Finalizar compra</h1>';
   if(isAdmin){app.innerHTML=`${H}<p class="state">Conta administrativa: você tem acesso total aos livros e não precisa comprar.</p></div>`;return}
@@ -1038,10 +1041,14 @@ async function checkoutCarrinho(){
   const {S,pend}=await grpLoad(),ok=S.pay.map(x=>x.b),note='';
   if(!ok.length){const rej=G.some(o=>(o.payments||[]).some(p=>p.status==='rejected'));app.innerHTML=`${H}${note}${G.length?state(rej?'O pagamento do seu último pedido em grupo foi recusado. Os livros continuam bloqueados. Você pode montar um novo pedido.':'Seu último pedido em grupo foi concluído. Veja seus livros na estante.'):state('Seu carrinho está vazio.')}<p class="row"><a class="btn" href="#/minha-estante">Minha estante</a><a class="btn alt" href="#/catalogo">Ver catálogo</a></p></div>`;return}
   if(pend.length){app.innerHTML=`${H}${state('Estes livros já têm um pedido em andamento: '+pend.map(b=>b.title).join(', ')+'. Conclua ou cancele esse pedido antes de finalizar um novo.')}<p class="row"><a class="btn" href="#/carrinho">Voltar ao carrinho</a></p></div>`;return}
-  if(ok.length<2||ok.length>CART_MAX){app.innerHTML=`${H}${state(ok.length<2?'Para um pedido em grupo, escolha ao menos 2 livros. Para um livro só, use “Comprar este livro” no carrinho.':'O limite é de '+CART_MAX+' livros por compra. Remova alguns do carrinho.')}<p class="row"><a class="btn" href="#/carrinho">Voltar ao carrinho</a></p></div>`;return}
-  app.innerHTML=`<div class="ck">${ckStepper(1)}<h1>Sua compra</h1>${note}${ok.map(b=>`<div class="ckbook"><div class="cover">${coverHtml(b)}</div><div><h2 style="margin:.1rem 0">${esc(b.title)}</h2>${by(b)}<p class="price">${brl(b.effective_price_cents)}</p></div></div>`).join('')}${grpRows(ok.length,S.subtotal,S.total)}<p class="mute">Você fará um único Pix pelo valor total e enviará um único comprovante.</p><div class="ckrow"><button data-a="cartorder" data-ids='${JSON.stringify(ok.map(b=>b.id))}'>Gerar pedido e pagar com Pix</button><a class="btn alt" href="#/carrinho">Voltar ao carrinho</a></div></div>`;
+  if(ok.length<1||ok.length>CART_MAX){app.innerHTML=`${H}${state(ok.length<1?'Seu carrinho está vazio.':'O limite é de '+CART_MAX+' livros por compra. Remova alguns do carrinho.')}<p class="row"><a class="btn" href="#/carrinho">Voltar ao carrinho</a></p></div>`;return}
+  const CP=await cpPreview(S),CPD=CP.ok?CP.discount:0,CPB=CP.ok?`<p class="mute">Cupom <strong>${esc(CP.code)}</strong> será aplicado ao gerar o pedido.</p>`:'';
+  app.innerHTML=`<div class="ck">${ckStepper(1)}<h1>Sua compra</h1>${note}${ok.map(b=>`<div class="ckbook"><div class="cover">${coverHtml(b)}</div><div><h2 style="margin:.1rem 0">${esc(b.title)}</h2>${by(b)}<p class="price">${brl(b.effective_price_cents)}</p></div></div>`).join('')}${grpRows(ok.length,S.subtotal,S.total-CPD,CPD)}${CPB}<p class="mute">Você fará um único Pix pelo valor total e enviará um único comprovante.</p><div class="ckrow"><button data-a="cartorder" data-ids='${JSON.stringify(ok.map(b=>b.id))}'>Gerar pedido e pagar com Pix</button><a class="btn alt" href="#/carrinho">Voltar ao carrinho</a></div></div>`;
 }
-actions.cartorder=async b=>{const ids=JSON.parse(b.dataset.ids);const {error}=await sb.rpc('create_cart_order',{p_book_ids:ids});if(error)return fail(error);for(const i of ids){try{await cartRemove(i)}catch(e){}}await route();toast('Pedido criado. Pague com o Pix e envie o comprovante.')};
+actions.cartorder=async b=>{const ids=JSON.parse(b.dataset.ids);const {data,error}=await sb.rpc('create_cart_order',{p_book_ids:ids});if(error)return fail(error);for(const i of ids){try{await cartRemove(i)}catch(e){}}
+  let msg='Pedido criado. Pague com o Pix e envie o comprovante.';const code=cpSaved();
+  if(code&&data&&data.order_ids){const {error:ce}=await sb.rpc('apply_coupon',{p_code:code,p_order_ids:data.order_ids});if(ce)msg='Pedido criado, mas o cupom não foi aplicado: '+(ERR[ce.message]||ce.message)+'.';else{cpSave('');msg='Pedido criado com o cupom aplicado. Pague com o Pix e envie o comprovante.'}}
+  await route();toast(msg)};
 actions.cartproof=async b=>{
   const f=document.getElementById('gproof')?.files?.[0],ids=JSON.parse(b.dataset.pays||'[]');
   if(!f)return toast('Escolha o arquivo do comprovante.');if(f.size>5*1024*1024)return toast('O arquivo deve ter até 5 MB.');
@@ -1126,7 +1133,7 @@ Object.assign(ERR,{
   coupon_invalid:'Cupom inválido ou desativado.',coupon_not_started:'Este cupom ainda não está valendo.',coupon_expired:'Este cupom expirou.',
   coupon_exhausted:'Este cupom atingiu o limite de usos.',coupon_user_limit:'Você já usou este cupom o máximo de vezes permitido.',
   coupon_not_applicable:'Este cupom não vale para os livros deste pedido.',coupon_min_order:'O pedido não atinge o valor mínimo deste cupom.',
-  coupon_exceeds_total:'O desconto deste cupom é maior que o valor do pedido.',coupon_already_applied:'Este pedido já tem um cupom aplicado.',
+  coupon_not_first_purchase:'Este cupom vale só para a primeira compra.',coupon_exceeds_total:'O desconto deste cupom é maior que o valor do pedido.',coupon_already_applied:'Este pedido já tem um cupom aplicado.',
   proof_already_sent:'O comprovante já foi enviado, então o cupom não pode mais ser alterado.',orders_invalid:'Pedido não encontrado ou já finalizado.',
   not_authenticated:'Entre na sua conta para usar o cupom.'});
 async function cpInfo(ids){
@@ -1165,6 +1172,8 @@ const cpForm=(c,B)=>{
   <label>Usos por pessoa<input name="mu" type="number" min="1" inputmode="numeric" required value="${v.max_per_user??1}"></label>
   <label>Descrição interna (opcional)<input name="d" maxlength="120" value="${esc(v.description||'')}"></label>
   <fieldset class="cpbk"><legend>Livros válidos <span class="mute">(nenhum marcado = todos)</span></legend>${B.map(b=>`<label class="chk"><input type="checkbox" name="bk" value="${esc(b.id)}"${sel.has(b.id)?' checked':''}> ${esc(b.title)}</label>`).join('')}</fieldset>
+  <label class="chk"><input type="checkbox" name="fp"${v.first_purchase_only?' checked':''}> Só para a primeira compra</label>
+  <label class="chk"><input type="checkbox" name="wl"${v.is_welcome?' checked':''}> Mostrar como oferta de boas-vindas (aviso para novos visitantes)</label>
   <label class="chk"><input type="checkbox" name="ac"${!c||v.is_active?' checked':''}> Cupom ativo</label>
   <button>${c?'Salvar cupom':'Criar cupom'}</button></form>`;
 };
@@ -1191,7 +1200,7 @@ async function adminCupons(){
   ${C.length?C.map(c=>{const [sl,sc]=stat(c),u=U[c.id]||{b:new Set(),d:0},n=u.b.size;
     const scope=c.book_ids&&c.book_ids.length?`${pl(c.book_ids.length,'livro','livros')}: ${c.book_ids.map(i=>esc(titleOf.get(i)||'?')).join(', ')}`:'Todos os livros';
     const when=[c.starts_at?`desde ${fmt(c.starts_at)}`:'',c.ends_at?`até ${fmt(c.ends_at)}`:''].filter(Boolean).join(' ')||'Sem prazo';
-    const meta=[scope,when,c.min_order_cents?`mínimo ${brl(c.min_order_cents)}`:'',`${n}${c.max_redemptions?` de ${c.max_redemptions}`:''} ${n===1?'uso':'usos'}`,`${c.max_per_user} por pessoa`,u.d?`${brl(u.d)} em descontos confirmados`:''].filter(Boolean).join(' · ');
+    const meta=[scope,when,c.first_purchase_only?'só na primeira compra':'',c.is_welcome?'oferta de boas-vindas':'',c.min_order_cents?`mínimo ${brl(c.min_order_cents)}`:'',`${n}${c.max_redemptions?` de ${c.max_redemptions}`:''} ${n===1?'uso':'usos'}`,`${c.max_per_user} por pessoa`,u.d?`${brl(u.d)} em descontos confirmados`:''].filter(Boolean).join(' · ');
     return `<div class="acard"><div class="cp-h"><div><code class="cp-code">${esc(c.code)}</code> <span class="tag ${sc}">${sl}</span>${c.description?`<p class="mute" style="margin:.4rem 0 0">${esc(c.description)}</p>`:''}</div><div class="cp-v">${val(c)}</div></div><p class="mute cp-m">${meta}</p>
     <div class="row"><button class="alt sm" data-a="cptoggle" data-id="${esc(c.id)}" data-on="${c.is_active?1:0}">${c.is_active?'Desativar':'Ativar'}</button><button class="danger sm" data-a="cpdel" data-id="${esc(c.id)}" data-n="${n}">Excluir</button></div>
     <details class="cp-e"><summary>Editar cupom</summary>${cpForm(c,B)}</details></div>`}).join(''):state('Nenhum cupom criado ainda.')}`;
@@ -1208,7 +1217,7 @@ forms.coupon=async f=>{
   const mx=f.mx.value?parseInt(f.mx.value,10):null,mu=parseInt(f.mu.value,10);
   if(!(mu>=1))return toast('Informe quantos usos por pessoa (mínimo 1).');
   const bks=[...f.querySelectorAll('input[name=bk]:checked')].map(x=>x.value);
-  const row={code,description:f.d.value.trim()||null,discount_type:ty,discount_value:dv,min_order_cents:mn||0,starts_at:st?st.toISOString():null,ends_at:en?en.toISOString():null,max_redemptions:mx,max_per_user:mu,book_ids:bks.length?bks:null,is_active:f.ac.checked};
+  const row={code,description:f.d.value.trim()||null,discount_type:ty,discount_value:dv,min_order_cents:mn||0,starts_at:st?st.toISOString():null,ends_at:en?en.toISOString():null,max_redemptions:mx,max_per_user:mu,book_ids:bks.length?bks:null,is_active:f.ac.checked,first_purchase_only:f.fp.checked,is_welcome:f.wl.checked};
   const id=f.dataset.id;
   const {error}=id?await sb.from('coupons').update(row).eq('id',id):await sb.from('coupons').insert({...row,created_by:user.id});
   if(error)return toast(error.code==='23505'?'Já existe um cupom com esse código.':error.message);
@@ -1230,7 +1239,51 @@ actions.cpdel=async b=>{
 const megaT=(h,i,t,s)=>`<a class="mg-i" href="${h}"><i>${svgI(DI[i])}</i><span><b>${t}</b><small>${s}</small></span></a>`;
 const megaH=()=>`<details class="mega"><summary>Mais${CHEV}</summary><div class="mega-p"><div><h5>Ler</h5>${megaT('#/catalogo','book','Catálogo','Todos os livros')}${megaT('#/descobrir','spark','Descobrir','Universos, quizzes e mais')}${user?megaT('#/minha-estante','shelf','Minha estante','Seus livros e progresso'):''}</div><div><h5>A autora</h5>${megaT('#/sobre','author','Sobre','Conheça a Thau Luna')}${megaT('#/blog','blog','Blog','Novidades e bastidores')}</div><div class="mg-s"><h5>Informações</h5><a class="mg-l" href="#/politicas">Termos e Políticas</a><a class="mg-l" href="#/privacidade">Privacidade</a><a class="mg-l" href="#/compra">Compra e Reembolso</a><a class="mg-l" href="mailto:${CONTATO}">Fale com a gente</a>${user?'':'<a class="btn" href="#/cadastro">Criar conta</a>'}</div></div></details>`;
 document.addEventListener('click',e=>{const d=document.querySelector('.mega[open]');if(d&&(!d.contains(e.target)||e.target.closest('.mega-p a')))d.open=false});
-const routes=[[/^\/checkout-carrinho$/,checkoutCarrinho],[/^\/sobre$/,sobre],[/^\/blog$/,blog],[/^\/blog\/([^/]+)$/,blogPost],[/^\/politicas$/,legalHub],[/^\/(privacidade|termos|compra|politica-da-comunidade|politica-de-spoilers|direitos-autorais|politica-de-traducoes|politica-de-quizzes|cookies)$/,legalSlug],[/^\/admin\/livros\/([^/]+)$/,adminLivroCaps,1],[/^\/$/,home],[/^\/catalogo$/,catalogo],[/^\/livro\/([^/]+)$/,livro],[/^\/login$/,login],[/^\/cadastro$/,cadastro],[/^\/recuperar$/,recuperar],[/^\/minha-conta$/,conta,1],[/^\/minha-estante$/,estante,1],[/^\/quiz\/([^/]+)$/,quiz],[/^\/universos$/,universos],[/^\/universos\/([^/]+)$/,universo],[/^\/quizzes$/,quizzes],[/^\/ler\/([^/]+)\/(\d+)$/,ler],[/^\/admin$/,admin,1],[/^\/admin\/livros$/,adminLivros,1],[/^\/admin\/pedidos$/,adminPedidos,1],[/^\/admin\/usuarios$/,adminUsuarios,1],[/^\/admin\/configuracoes$/,adminPix,1],[/^\/admin\/importar$/,adminImportar,1],[/^\/admin\/traducoes$/,adminTraducoes,1],[/^\/admin\/avatares$/,adminAvatares,1],[/^\/checkout\/([^/]+)$/,checkout],[/^\/carrinho$/,carrinho],[/^\/configuracoes(?:\/([^/]+))?$/,configuracoes],[/^\/descobrir$/,descobrir],[/^\/admin\/cupons$/,adminCupons,1]];
+// ---- cupom no carrinho, aviso de primeira compra, Como funciona e Dúvidas ----
+const CPK='ll-cp',WM_KEY='ll-welcome-off';
+const cpSaved=()=>{try{return (localStorage.getItem(CPK)||'').trim().toUpperCase()}catch(e){return''}};
+const cpSave=c=>{try{c?localStorage.setItem(CPK,c):localStorage.removeItem(CPK)}catch(e){}};
+async function cpPreview(S){
+  const code=cpSaved();if(!code||!S.count)return {code:''};
+  const {data,error}=await sb.rpc('preview_coupon',{p_code:code,p_book_ids:S.pay.map(i=>i.b.id)});
+  if(error)return {code,off:/could not find|schema cache|does not exist/i.test(error.message||''),message:'Não foi possível conferir o cupom agora.'};
+  if(!data||!data.ok){cpSave('');return {code,message:ERR[data&&data.code]||'Cupom inválido ou desativado.'}}
+  return {code:data.code,ok:true,discount:data.discount_cents};
+}
+const cpCartBox=CP=>CP.off?'':CP.ok?`<div class="cp-cart"><p><strong>Cupom ${esc(CP.code)}</strong> aplicado: −${brl(CP.discount)}</p><button type="button" class="alt sm" data-a="cpcartrm">Remover cupom</button></div>`:`<form class="cp-cart" data-f="cpcart"><label for="cpin">Cupom de desconto</label><div class="row"><input id="cpin" name="c" autocomplete="off" autocapitalize="characters" placeholder="Digite o cupom" value="${esc(CP.code||'')}"><button>Aplicar</button></div>${CP.message?`<p class="state bad">${esc(CP.message)}</p>`:''}</form>`;
+forms.cpcart=async f=>{const c=String(f.c.value||'').trim().toUpperCase();if(!c)return toast('Digite o cupom.');cpSave(c);await route()};
+actions.cpcartrm=async()=>{cpSave('');await route()};
+async function welcomeInit(){
+  try{if(localStorage.getItem(WM_KEY)||document.getElementById('wm'))return}catch(e){return}
+  await roleP;if(isAdmin||/^#\/(admin|ler|checkout|login|cadastro)/.test(location.hash))return;
+  const {data,error}=await sb.rpc('welcome_offer');if(error||!data||!data.code)return;
+  if(user){const r=await sb.from('orders').select('id',{count:'exact',head:true}).eq('user_id',user.id).eq('status','paid');if((r.count||0)>0)return}
+  const d=data.discount_type==='percent'?`${data.discount_value}% de desconto`:`${brl(data.discount_value)} de desconto`;
+  const cond=[data.min_order_cents?`Em pedidos a partir de ${brl(data.min_order_cents)}.`:'',data.first_purchase_only?'Válido na primeira compra.':'',data.ends_at?`Válido até ${fmt(data.ends_at)}.`:''].filter(Boolean).join(' ');
+  const m=document.createElement('div');m.id='wm';m.className='wm';m.setAttribute('role','dialog');m.setAttribute('aria-modal','true');m.setAttribute('aria-labelledby','wm-t');
+  m.innerHTML=`<div class="wm-c"><button type="button" class="wm-x alt" aria-label="Fechar" data-a="wmclose">×</button><p class="eyebrow">Boas-vindas</p><h2 id="wm-t">${esc(d)} na sua primeira compra</h2><p>Guarde o cupom e ele será aplicado no seu carrinho.</p><code class="wm-code">${esc(data.code)}</code><p class="row"><button type="button" data-a="wmuse" data-c="${esc(data.code)}">Guardar o cupom</button><button type="button" class="alt" data-a="wmclose">Agora não</button></p>${cond?`<p class="mute"><small>${esc(cond)}</small></p>`:''}</div>`;
+  m.addEventListener('click',e=>{if(e.target===m)actions.wmclose()});document.body.appendChild(m);const b=m.querySelector('[data-a=wmuse]');if(b)b.focus();
+}
+actions.wmclose=()=>{try{localStorage.setItem(WM_KEY,'1')}catch(e){}const m=document.getElementById('wm');if(m)m.remove()};
+actions.wmuse=b=>{cpSave(b.dataset.c);actions.wmclose();toast('Cupom guardado! Ele aparece no seu carrinho.');go('/catalogo')};
+addEventListener('keydown',e=>{if(e.key==='Escape'&&document.getElementById('wm'))actions.wmclose()});
+setTimeout(welcomeInit,4000);
+const comoFunciona=()=>`<section class="how" aria-labelledby="how-t"><h2 id="how-t">Como funciona a compra</h2><ol class="how-l"><li><b>1 · Carrinho e conta</b><span>Escolha seus livros e adicione ao carrinho. Para finalizar, é preciso ter uma conta: o cadastro é rápido e é nela que seus livros ficam guardados. A conexão com o site é segura (HTTPS).</span></li><li><b>2 · Pix e comprovante</b><span>Ao finalizar, você vê o valor total, o QR Code e o Pix Copia e Cola. Pague pelo app do seu banco e envie o comprovante na própria página.</span></li><li><b>3 · Confirmação e leitura</b><span>A administração confere o pagamento manualmente. Só depois da confirmação os livros são liberados, direto na sua Minha estante. Nada é enviado fisicamente: a leitura é feita aqui, na plataforma.</span></li></ol></section>`;
+function duvidas(){
+  const Q=[['Como compro um livro?','Adicione ao carrinho (ou use “Comprar este livro”), entre na sua conta e finalize. Você vê o valor total, o QR Code e o Pix Copia e Cola; depois de pagar, envie o comprovante.'],
+  ['Preciso criar uma conta?','Sim. A conta guarda seus livros na Minha estante e permite acompanhar seus pedidos. O cadastro é rápido e o carrinho não se perde ao entrar.'],
+  ['Posso comprar vários livros de uma vez?','Sim, até 10 livros por compra, com um único Pix e um único comprovante para o pedido inteiro.'],
+  ['Como funciona o Pix?','O pagamento é feito por você, no app do seu banco, pelo QR Code ou pelo Copia e Cola. O site não recebe dados do seu cartão nem acessa a sua conta bancária.'],
+  ['Quando meu livro é liberado?','Depois que a administração confere e confirma o pagamento. O comprovante enviado não libera o livro sozinho. A conferência é manual, com prazo previsto de até 4 dias corridos.'],
+  ['Onde ficam os livros que comprei?','Em “Minha estante”, na sua conta. A leitura é feita dentro da plataforma.'],
+  ['Como uso um cupom?','No carrinho, no campo “Cupom de desconto”. Você também pode aplicá-lo na tela de pagamento, antes de enviar o comprovante. O desconto é calculado pelo servidor.'],
+  ['Meu pagamento foi recusado ou paguei errado. E agora?','Escreva para o contato abaixo informando o número do pedido. A administração orienta o próximo passo.'],
+  ['Posso desistir da compra?','Sim, conforme a Política de Compras, que explica o direito de arrependimento e como pedir.'],
+  ['Esqueci minha senha.','Na tela Entrar, toque em “Esqueci a senha” e siga as instruções enviadas ao seu e-mail.']];
+  app.innerHTML=`<article class="legal"><p class="eyebrow">Atendimento</p><h1>Dúvidas frequentes</h1><div class="faq">${Q.map(([q,a])=>`<details><summary>${q}</summary><p>${a}</p></details>`).join('')}</div>${comoFunciona()}<p class="row"><a class="btn" href="mailto:${CONTATO}">Falar com a gente</a><a class="btn alt" href="#/politicas">Termos e Políticas</a></p></article>`;
+}
+
+const routes=[[/^\/duvidas$/,duvidas],[/^\/checkout-carrinho$/,checkoutCarrinho],[/^\/sobre$/,sobre],[/^\/blog$/,blog],[/^\/blog\/([^/]+)$/,blogPost],[/^\/politicas$/,legalHub],[/^\/(privacidade|termos|compra|politica-da-comunidade|politica-de-spoilers|direitos-autorais|politica-de-traducoes|politica-de-quizzes|cookies)$/,legalSlug],[/^\/admin\/livros\/([^/]+)$/,adminLivroCaps,1],[/^\/$/,home],[/^\/catalogo$/,catalogo],[/^\/livro\/([^/]+)$/,livro],[/^\/login$/,login],[/^\/cadastro$/,cadastro],[/^\/recuperar$/,recuperar],[/^\/minha-conta$/,conta,1],[/^\/minha-estante$/,estante,1],[/^\/quiz\/([^/]+)$/,quiz],[/^\/universos$/,universos],[/^\/universos\/([^/]+)$/,universo],[/^\/quizzes$/,quizzes],[/^\/ler\/([^/]+)\/(\d+)$/,ler],[/^\/admin$/,admin,1],[/^\/admin\/livros$/,adminLivros,1],[/^\/admin\/pedidos$/,adminPedidos,1],[/^\/admin\/usuarios$/,adminUsuarios,1],[/^\/admin\/configuracoes$/,adminPix,1],[/^\/admin\/importar$/,adminImportar,1],[/^\/admin\/traducoes$/,adminTraducoes,1],[/^\/admin\/avatares$/,adminAvatares,1],[/^\/checkout\/([^/]+)$/,checkout],[/^\/carrinho$/,carrinho],[/^\/configuracoes(?:\/([^/]+))?$/,configuracoes],[/^\/descobrir$/,descobrir],[/^\/admin\/cupons$/,adminCupons,1]];
 async function route(){
   header();onscroll=null;const path=(location.hash.slice(1)||'/').split('?')[0];
   const raw=location.hash.slice(1);
