@@ -659,3 +659,36 @@ a.btn.alt:hover,button.alt:hover{background:var(--acc);color:var(--onacc)}
 .bk-i .price s{color:var(--mute);font-weight:400;margin-right:.25rem}
 .bk .bk-add:not(#_){margin-top:.5rem;width:100%;justify-content:center;text-align:center}
 .mega-p.two{grid-template-columns:1.2fr 1fr;width:min(560px,94vw)}
+
+/* ===== gaveta do carrinho ===== */
+.mc{position:fixed;inset:0;z-index:60;background:color-mix(in srgb,var(--ink) 40%,transparent);opacity:0;transition:opacity .2s}
+.mc[hidden]{display:none}.mc.on{opacity:1}
+body.mc-open{overflow:hidden}
+.mc-p{position:absolute;top:0;right:0;bottom:0;width:min(400px,100vw);display:flex;flex-direction:column;background:var(--page);border-left:1px solid var(--line);box-shadow:-18px 0 40px -24px rgba(90,20,45,.45);transform:translateX(100%);transition:transform .25s}
+.mc.on .mc-p{transform:none}
+.mc-h{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:.9rem 1.1rem;border-bottom:1px solid var(--line)}
+.mc-h h2{margin:0;font-size:1.7rem}
+.mc-x:not(#_){width:44px;height:44px;min-height:0;padding:0;background:transparent;color:var(--mute);border-radius:50%}
+.mc-x:hover:not(#_){background:var(--soft);color:var(--soft-ink)}
+.mc-x svg:not(#_){width:1.3rem;height:1.3rem;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round}
+.mc-l{list-style:none;margin:0;padding:1rem 1.1rem;flex:1;overflow-y:auto;display:grid;gap:1rem;align-content:start}
+.mc-i{display:grid;grid-template-columns:58px 1fr auto;gap:.8rem;align-items:center}
+.mc-cv{display:block}.mc-cv .cover{padding:.3rem;font-size:.6rem;box-shadow:none}.mc-cv .cover small{display:none}
+.mc-t{min-width:0;display:grid;gap:.1rem}
+.mc-t>a{font:600 1.25rem/1.15 var(--serif);color:var(--ink);text-decoration:none}.mc-t>a:hover{color:var(--link)}
+.mc-t .by{font:italic 500 .95rem var(--serif);color:var(--mute)}
+.mc-t .price{font-weight:600;font-size:.92rem}.mc-t .price s{color:var(--mute);font-weight:400;margin-right:.25rem}
+.mc-f{padding:1rem 1.1rem calc(1rem + env(safe-area-inset-bottom,0px));border-top:1px solid var(--line);display:grid;gap:.6rem}
+.mc-f dl{margin:0 0 .3rem;display:grid;gap:.35rem}.mc-f dl div{display:flex;justify-content:space-between;gap:1rem}
+.mc-f dt{color:var(--mute)}.mc-f dd{margin:0;font-weight:700;font-size:1.1rem}
+.mc-f .mc-s dd{color:var(--link);font-size:.95rem}
+.mc-f .btn:not(#_){width:100%}
+.mc-e{padding:2rem 1.1rem;text-align:center;display:grid;gap:1rem;justify-items:center}
+@media(prefers-reduced-motion:reduce){.mc,.mc-p{transition:none}}
+
+/* ===== faixa de lançamento ===== */
+.lbar{display:flex;flex-wrap:wrap;justify-content:center;gap:.2rem 1.4rem;padding:.5rem clamp(1rem,4vw,2rem);background:var(--sun);color:var(--sunink);font:500 .9rem/1.35 var(--ui);text-align:center;text-decoration:none}
+.lbar:hover{color:var(--sunink);filter:brightness(.97)}
+.lbar s{opacity:.7}
+.lbar-t time{font-variant-numeric:tabular-nums;font-weight:700}
+body.is-adm .lbar{display:none}

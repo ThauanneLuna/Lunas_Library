@@ -55,7 +55,7 @@ function header(){
 const MOON='<svg class="moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>';
 
 // ---- páginas ----
-const priceHtml=b=>b.is_launch_active?`<s>${brl(b.price_regular_cents)}</s> ${brl(b.effective_price_cents)}`:brl(b.effective_price_cents);
+const priceHtml=b=>b.price_regular_cents>b.effective_price_cents?`<s>${brl(b.price_regular_cents)}</s> ${brl(b.effective_price_cents)}`:brl(b.effective_price_cents);
 const badges=b=>`${b.is_launch_active?'<span class="tag sun">Lançamento</span>':''}${b.published_chapter_count?'':'<span class="tag">Conteúdo ainda não disponível</span>'}${b.is_purchasable?'':'<span class="tag">Compra ainda não disponível</span>'}`;
 const coverHtml=b=>{const c=pub('book-covers',b.cover_path);return c?`<img src="${esc(c)}" alt="Capa de ${esc(b.title)}">`:`${esc(b.title)}<small>Capa em breve</small>`};
 const bookCard=b=>`<a class="card" href="#/livro/${esc(b.slug)}"><div class="cover">${coverHtml(b)}</div><h3>${esc(b.title)}</h3><p class="price">${priceHtml(b)}</p>${b.description?`<p class="clamp">${esc(b.description)}</p>`:''}<div>${badges(b)}</div></a>`;
@@ -444,8 +444,8 @@ const gtag=b=>b.genre?`<span class="tag">${esc(b.genre)}</span>`:'';
 const genresOf=bk=>[...new Set(bk.map(b=>b.genre).filter(Boolean))];
 const pctOff=b=>b.price_regular_cents>0&&b.effective_price_cents<b.price_regular_cents?Math.round((1-b.effective_price_cents/b.price_regular_cents)*100):0;
 const hoverImg=b=>{const h=b.cover_hover_path?pub('book-covers',b.cover_hover_path):null;return h?`<img class="cv-h" src="${esc(h)}" alt="" loading="lazy">`:''};
-const quickAdd=b=>{if(isAdmin||!b.is_purchasable||b.status!=='published'||cartOwned.has(b.id))return '';return cartIds.includes(b.id)?'<a class="btn alt sm bk-add" href="#/carrinho">No carrinho</a>':`<button class="alt sm bk-add" data-a="cartquick" data-id="${esc(b.id)}">Adicionar ao carrinho</button>`};
-const card=b=>{const off=b.is_launch_active?pctOff(b):0;return `<article class="bk"><a class="bk-cv" href="#/livro/${esc(b.slug)}"><div class="cover">${coverHtml(b)}${hoverImg(b)}${b.is_launch_active?'<span class="ribbon">Lançamento</span>':''}${off?`<span class="off">−${off}%</span>`:''}</div></a><div class="bk-i">${gtag(b)}<a class="bk-t" href="#/livro/${esc(b.slug)}"><h3>${esc(b.title)}</h3></a>${by(b)}<p class="price">${priceHtml(b)}</p>${quickAdd(b)}</div></article>`};
+const quickAdd=b=>{if(isAdmin||!b.is_purchasable||b.status!=='published'||cartOwned.has(b.id))return '';return cartIds.includes(b.id)?`<a class="btn alt sm bk-add" data-id="${esc(b.id)}" href="#/carrinho">No carrinho</a>`:`<button class="alt sm bk-add" data-a="cartquick" data-id="${esc(b.id)}">Adicionar ao carrinho</button>`};
+const card=b=>{const off=pctOff(b);return `<article class="bk"><a class="bk-cv" href="#/livro/${esc(b.slug)}"><div class="cover">${coverHtml(b)}${hoverImg(b)}${b.is_launch_active?'<span class="ribbon">Lançamento</span>':''}${off?`<span class="off">−${off}%</span>`:''}</div></a><div class="bk-i">${gtag(b)}<a class="bk-t" href="#/livro/${esc(b.slug)}"><h3>${esc(b.title)}</h3></a>${by(b)}<p class="price">${priceHtml(b)}</p>${quickAdd(b)}</div></article>`};
 const shelf=(t,items,more)=>items.length?`<section class="shelf"><div class="sh"><h2>${esc(t)}</h2>${more?`<a class="btn alt sm" href="${more}">Ver tudo</a>`:''}</div><div class="rail">${items.map(card).join('')}</div></section>`:'';
 const uniCard=u=>`<a class="uni" href="#/universos/${esc(u.slug)}"><b>${esc(ini(u.name))}</b><h3>${esc(u.name)}</h3>${u.description?`<p class="clamp">${esc(u.description)}</p>`:''}</a>`;
 const IC={h:'M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z',c:'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z',e:'M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3zM5 17a3 3 0 0 1 3-3h11',m:'M4 5h16v11H9l-5 4z',u:'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0',o:'M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z'};
@@ -1312,3 +1312,73 @@ setTimeout(()=>{if(!app.innerHTML.trim())route()},3000);
 
 // ---- card do catálogo: adicionar ao carrinho sem recarregar (mantém filtros e busca) ----
 actions.cartquick=async b=>{await cartAdd(b.dataset.id);toast('Livro adicionado ao carrinho.');const a=document.createElement('a');a.className='btn alt sm bk-add';a.href='#/carrinho';a.textContent='No carrinho';b.replaceWith(a)};
+
+// ---- gaveta do carrinho (abre ao adicionar um livro ou ao tocar no ícone do carrinho) ----
+let mcLast=null;
+const mcEl=()=>{let d=document.getElementById('mc');if(d)return d;
+  d=document.createElement('aside');d.id='mc';d.className='mc';d.hidden=true;d.setAttribute('role','dialog');d.setAttribute('aria-modal','true');d.setAttribute('aria-label','Seu carrinho');
+  d.addEventListener('click',e=>{if(e.target===d||e.target.closest('.mc a[href]'))mcClose()});document.body.appendChild(d);return d};
+async function mcDraw(){
+  const d=mcEl();let items=[];
+  if(cartIds.length){const {data}=await sb.from('book_catalog').select('*').in('id',cartIds.slice());const m=new Map((data||[]).map(b=>[b.id,b]));items=cartIds.map(id=>m.get(id)).filter(b=>b&&b.status==='published'&&b.is_purchasable)}
+  const sub=items.reduce((t,b)=>t+b.effective_price_cents,0),save=items.reduce((t,b)=>t+Math.max(0,b.price_regular_cents-b.effective_price_cents),0);
+  const head=`<div class="mc-h"><h2>Seu carrinho</h2><button type="button" class="mc-x" data-a="mcclose" aria-label="Fechar carrinho"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>`;
+  d.innerHTML=`<div class="mc-p">${head}${items.length?`<ul class="mc-l">${items.map(b=>`<li class="mc-i"><a class="mc-cv" href="#/livro/${esc(b.slug)}" aria-label="${esc(b.title)}"><div class="cover">${coverHtml(b)}</div></a><div class="mc-t"><a href="#/livro/${esc(b.slug)}">${esc(b.title)}</a>${by(b)}<span class="price">${priceHtml(b)}</span></div><button type="button" class="alt sm" data-a="mcrm" data-id="${esc(b.id)}" aria-label="Remover ${esc(b.title)} do carrinho">Remover</button></li>`).join('')}</ul><div class="mc-f"><dl><div><dt>Subtotal</dt><dd>${brl(sub)}</dd></div>${save?`<div class="mc-s"><dt>Você economiza</dt><dd>${brl(save)}</dd></div>`:''}</dl><a class="btn big" href="#/checkout-carrinho">Finalizar compra</a><a class="btn alt" href="#/carrinho">Ver carrinho</a></div>`:`<div class="mc-e"><p>Seu carrinho está vazio.</p><a class="btn" href="#/catalogo">Ver o catálogo</a></div>`}</div>`;
+}
+async function mcOpen(){
+  if(isAdmin)return;
+  const d=mcEl();if(d.hidden)mcLast=document.activeElement;
+  d.hidden=false;document.body.classList.add('mc-open');requestAnimationFrame(()=>d.classList.add('on'));
+  await mcDraw();(d.querySelector('.mc-x')||d).focus();
+}
+function mcClose(){
+  const d=document.getElementById('mc');if(!d||d.hidden)return;
+  d.classList.remove('on');document.body.classList.remove('mc-open');
+  setTimeout(()=>{if(!d.classList.contains('on'))d.hidden=true},220);
+  if(mcLast&&mcLast.isConnected)mcLast.focus();
+}
+document.addEventListener('click',e=>{
+  const a=e.target.closest('#cartlink');if(!a||e.metaKey||e.ctrlKey||e.shiftKey||e.button)return;
+  if((location.hash.slice(1)||'/').startsWith('/carrinho'))return;
+  e.preventDefault();mcOpen();
+});
+document.addEventListener('keydown',e=>{
+  const d=document.getElementById('mc');if(!d||d.hidden)return;
+  if(e.key==='Escape'){mcClose();return}
+  if(e.key!=='Tab')return;
+  const f=[...d.querySelectorAll('a[href],button:not([disabled])')];if(!f.length)return;
+  const i=f.indexOf(document.activeElement);
+  if(e.shiftKey&&i<=0){e.preventDefault();f[f.length-1].focus()}else if(!e.shiftKey&&i===f.length-1){e.preventDefault();f[0].focus()}
+});
+addEventListener('hashchange',mcClose);
+actions.mcclose=()=>mcClose();
+actions.mcrm=async b=>{
+  const id=b.dataset.id;await cartRemove(id);await mcDraw();
+  document.querySelectorAll('a.bk-add').forEach(a=>{if(a.dataset.id!==id)return;
+    const n=document.createElement('button');n.className='alt sm bk-add';n.dataset.a='cartquick';n.dataset.id=id;n.textContent='Adicionar ao carrinho';a.replaceWith(n)});
+  if((location.hash.slice(1)||'/').startsWith('/livro/'))route();
+};
+actions.cartquick=async b=>{
+  await cartAdd(b.dataset.id);
+  const a=document.createElement('a');a.className='btn alt sm bk-add';a.href='#/carrinho';a.dataset.id=b.dataset.id;a.textContent='No carrinho';b.replaceWith(a);
+  mcOpen();
+};
+actions.cartadd=async b=>{await cartAdd(b.dataset.id);await route();mcOpen()};
+
+// ---- faixa de lançamento no topo: preço promocional e contagem regressiva ----
+async function lbarInit(){
+  try{
+    const {data}=await sb.from('book_catalog').select('*').eq('status','published').eq('is_launch_active',true).order('sort_order').limit(1);
+    const b=data&&data[0];if(!b||pctOff(b)<=0)return;
+    const end=b.launch_end_at?new Date(b.launch_end_at).getTime():0;
+    if(end&&end<=Date.now())return;
+    const bar=document.createElement('a');bar.className='lbar';bar.href='#/livro/'+b.slug;
+    const left=ms=>{const s=Math.max(0,Math.floor(ms/1000)),d=Math.floor(s/86400),h=String(Math.floor(s%86400/3600)).padStart(2,'0'),m=String(Math.floor(s%3600/60)).padStart(2,'0'),x=String(s%60).padStart(2,'0');return (d?d+(d===1?' dia ':' dias '):'')+h+':'+m+':'+x};
+    let t=0;
+    const paint=()=>{const ms=end-Date.now();if(end&&ms<=0){bar.remove();clearInterval(t);return}
+      bar.innerHTML=`<span><strong>${esc(b.title)}</strong> está em lançamento: de <s>${brl(b.price_regular_cents)}</s> por <strong>${brl(b.effective_price_cents)}</strong></span>${end?`<span class="lbar-t">Termina em <time>${left(ms)}</time></span>`:''}`};
+    paint();if(end)t=setInterval(paint,1000);
+    document.body.insertBefore(bar,document.querySelector('header'));
+  }catch(e){}
+}
+lbarInit();
