@@ -1,7 +1,7 @@
 // Somente chave PÚBLICA (publishable). Nunca coloque service_role aqui.
 const SB_URL='https://eulrdtkuxafhrygsbyuh.supabase.co', SB_KEY='sb_publishable_Vp3ulHnGeIPXfcT2P5y71A_olQSr9wp';
 const sb=supabase.createClient(SB_URL,SB_KEY,{auth:{lock:async(n,t,fn)=>await fn()}});
-let cartIds=[],cartP=Promise.resolve();
+let cartIds=[],cartP=Promise.resolve(),cartOwned=new Set(),GEN=[];
 const app=document.getElementById('app');
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const brl=c=>(c/100).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
@@ -59,7 +59,7 @@ const priceHtml=b=>b.is_launch_active?`<s>${brl(b.price_regular_cents)}</s> ${br
 const badges=b=>`${b.is_launch_active?'<span class="tag sun">Lançamento</span>':''}${b.published_chapter_count?'':'<span class="tag">Conteúdo ainda não disponível</span>'}${b.is_purchasable?'':'<span class="tag">Compra ainda não disponível</span>'}`;
 const coverHtml=b=>{const c=pub('book-covers',b.cover_path);return c?`<img src="${esc(c)}" alt="Capa de ${esc(b.title)}">`:`${esc(b.title)}<small>Capa em breve</small>`};
 const bookCard=b=>`<a class="card" href="#/livro/${esc(b.slug)}"><div class="cover">${coverHtml(b)}</div><h3>${esc(b.title)}</h3><p class="price">${priceHtml(b)}</p>${b.description?`<p class="clamp">${esc(b.description)}</p>`:''}<div>${badges(b)}</div></a>`;
-const books=async()=>{const {data,error}=await sb.from('book_catalog').select('*').eq('status','published').order('sort_order');if(error)throw error;return data};
+const books=async()=>{await roleP;await cartP;const {data,error}=await sb.from('book_catalog').select('*').eq('status','published').order('sort_order');if(error)throw error;const g=genresOf(data);if(JSON.stringify(g)!==JSON.stringify(GEN)){GEN=g;header()}return data};
 
 async function home(){
   const [bk,{data:un,error:e2}]=await Promise.all([books(),sb.from('universes').select('slug,name').order('sort_order')]);
@@ -289,6 +289,7 @@ async function adminLivros(){
   <label>Fim do lançamento<input name="le" type="datetime-local" value="${loc(b.launch_end_at)}"></label>
   <label>Descrição<textarea name="d" rows="3">${esc(b.description||'')}</textarea></label>
   <label>Capa<input name="cv" type="file" accept="image/jpeg,image/png,image/webp"></label>
+  ${'cover_hover_path' in b?`<label>Capa alternativa (aparece ao passar o mouse)<input name="cvh" type="file" accept="image/jpeg,image/png,image/webp"></label>`:''}
   ${'genre' in b?`<label>Gênero<input name="g" list="gl" maxlength="60" value="${esc(b.genre||'')}" placeholder="Ex.: Romance"></label><label>Autor<input name="au" maxlength="80" value="${esc(b.author||'')}"></label>`:''}
   <label><span><input name="pc" type="checkbox" style="width:auto" ${b.is_purchasable?'checked':''}> Disponível para compra</span></label>
   <button>Salvar livro</button></form><p class="mute">Sem janela de lançamento completa (início e fim), vale o preço normal.</p></div>`).join('')||state('Nenhum livro.')}`;
@@ -441,7 +442,10 @@ const avatar=p=>avHtml(p?.avatar_path,p?.display_name);
 const by=b=>b.author?`<span class="by">por ${esc(b.author)}</span>`:'';
 const gtag=b=>b.genre?`<span class="tag">${esc(b.genre)}</span>`:'';
 const genresOf=bk=>[...new Set(bk.map(b=>b.genre).filter(Boolean))];
-const card=b=>`<a class="bk" href="#/livro/${esc(b.slug)}"><div class="cover">${coverHtml(b)}${b.is_launch_active?'<span class="ribbon">Lançamento</span>':''}</div><div class="bk-i">${gtag(b)}<h3>${esc(b.title)}</h3>${by(b)}<p class="price">${priceHtml(b)}</p></div></a>`;
+const pctOff=b=>b.price_regular_cents>0&&b.effective_price_cents<b.price_regular_cents?Math.round((1-b.effective_price_cents/b.price_regular_cents)*100):0;
+const hoverImg=b=>{const h=b.cover_hover_path?pub('book-covers',b.cover_hover_path):null;return h?`<img class="cv-h" src="${esc(h)}" alt="" loading="lazy">`:''};
+const quickAdd=b=>{if(isAdmin||!b.is_purchasable||b.status!=='published'||cartOwned.has(b.id))return '';return cartIds.includes(b.id)?'<a class="btn alt sm bk-add" href="#/carrinho">No carrinho</a>':`<button class="alt sm bk-add" data-a="cartquick" data-id="${esc(b.id)}">Adicionar ao carrinho</button>`};
+const card=b=>{const off=b.is_launch_active?pctOff(b):0;return `<article class="bk"><a class="bk-cv" href="#/livro/${esc(b.slug)}"><div class="cover">${coverHtml(b)}${hoverImg(b)}${b.is_launch_active?'<span class="ribbon">Lançamento</span>':''}${off?`<span class="off">−${off}%</span>`:''}</div></a><div class="bk-i">${gtag(b)}<a class="bk-t" href="#/livro/${esc(b.slug)}"><h3>${esc(b.title)}</h3></a>${by(b)}<p class="price">${priceHtml(b)}</p>${quickAdd(b)}</div></article>`};
 const shelf=(t,items,more)=>items.length?`<section class="shelf"><div class="sh"><h2>${esc(t)}</h2>${more?`<a class="btn alt sm" href="${more}">Ver tudo</a>`:''}</div><div class="rail">${items.map(card).join('')}</div></section>`:'';
 const uniCard=u=>`<a class="uni" href="#/universos/${esc(u.slug)}"><b>${esc(ini(u.name))}</b><h3>${esc(u.name)}</h3>${u.description?`<p class="clamp">${esc(u.description)}</p>`:''}</a>`;
 const IC={h:'M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z',c:'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z',e:'M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3zM5 17a3 3 0 0 1 3-3h11',m:'M4 5h16v11H9l-5 4z',u:'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0',o:'M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z'};
@@ -454,7 +458,7 @@ function header(){
   const admL=[['/admin','Painel'],['/admin/livros','Livros'],['/admin/pedidos','Pedidos'],['/admin/cupons','Cupons'],['/admin/usuarios','Usuários'],['/admin/importar','Importar'],['/admin/traducoes','Traduções'],['/admin/avatares','Avatares'],['/admin/configuracoes','Pagamento'],['/','Voltar ao site']];
   const nm=user?(user.user_metadata?.display_name||user.email):'';
   const a=user?`<details class="acct"><summary aria-label="Minha conta">${avHtml(myProf?.avatar_path,myProf?.display_name||nm)}</summary><div class="acct-m"><a href="#/minha-estante">Minha estante</a><a href="#/minha-conta">Minha conta</a>${isAdmin?'<a href="#/admin">Administração</a>':''}<button class="alt sm" data-a="logout">Sair</button></div></details>`:'<a class="btn" href="#/login">Entrar</a>';
-  nav.innerHTML=(adm?admL:pubL).map(([p,t])=>`<a href="#${p}"${on(p)?' class="on" aria-current="page"':''}>${t}</a>`).join('')+(adm?'':megaH())+`<span class="navauth">${user?'<button class="alt" data-a="logout">Sair</button>':'<a class="btn" href="#/login">Entrar</a>'}</span>`;
+  nav.innerHTML=(adm?admL:pubL).map(([p,t])=>`<a href="#${p}"${on(p)?' class="on" aria-current="page"':''}>${t}</a>`).join('')+(adm?'':megaB()+megaH())+`<span class="navauth">${user?'<button class="alt" data-a="logout">Sair</button>':'<a class="btn" href="#/login">Entrar</a>'}</span>`;
   document.getElementById('auth').innerHTML=a;document.getElementById('admtag').hidden=!adm;nav.classList.remove('open');menu.setAttribute('aria-expanded','false');
   const T=[['/','Início','h'],['/catalogo','Catálogo','c'],['/descobrir','Descobrir','o']];
   document.getElementById('tabs').innerHTML=T.map(([p,t,i])=>`<a href="#${p}"${on(p)?' class="on" aria-current="page"':''}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="${IC[i]}"/></svg>${t}</a>`).join('');
@@ -747,6 +751,7 @@ const forms={
   book:async f=>{const reg=cents(f.pr.value),lau=cents(f.pl.value);if(reg===null||isNaN(reg)||isNaN(lau))return toast('Confira os preços.');
     const u={title:f.t.value,...(f.elements.namedItem('g')?{genre:f.g.value.trim()||null,author:f.au.value.trim()||'Thau Luna'}:{}),description:f.d.value||null,status:f.st.value,is_purchasable:f.pc.checked,price_regular_cents:reg,price_launch_cents:lau,launch_start_at:f.ls.value?new Date(f.ls.value).toISOString():null,launch_end_at:f.le.value?new Date(f.le.value).toISOString():null};
     const file=f.cv.files[0];if(file){const path=`${f.dataset.id}/cover-${Date.now()}`;const {error}=await sb.storage.from('book-covers').upload(path,file,{contentType:file.type});if(error)return fail(error);u.cover_path=path}
+    const fh=f.elements.namedItem('cvh')&&f.cvh.files[0];if(fh){const path=`${f.dataset.id}/hover-${Date.now()}`;const {error}=await sb.storage.from('book-covers').upload(path,fh,{contentType:fh.type});if(error)return fail(error);u.cover_hover_path=path}
     const {error}=await sb.from('books').update(u).eq('id',f.dataset.id);if(error)return fail(error);toast('Livro salvo.');route()},
   pix:async f=>{const u={id:1,pix_key_type:f.kt.value||null,pix_key:f.k.value||null,receiver_name:f.rn.value||null,copy_paste_code:f.cc.value||null,instructions:f.ins.value||null,updated_by:user.id};
     const file=f.qr.files[0];if(file){const path=`qr-${Date.now()}`;const {error}=await sb.storage.from('pix-assets').upload(path,file,{contentType:file.type});if(error)return fail(error);u.qr_code_path=path}
@@ -952,7 +957,7 @@ async function loadCart(){
       const {error}=await sb.from('cart_items').insert({user_id:user.id,book_id:id});if(!error||error.code==='23505')ids.push(id)}
     if(loc.length)cartLocalSet([]);
     if(ids.length){
-      const own=(await sb.from('book_entitlements').select('book_id').eq('user_id',user.id).eq('status','active').in('book_id',ids)).data||[];
+      const own=(await sb.from('book_entitlements').select('book_id').eq('user_id',user.id).eq('status','active').in('book_id',ids)).data||[];own.forEach(o=>cartOwned.add(o.book_id));
       for(const o of own)await sb.from('cart_items').delete().eq('user_id',user.id).eq('book_id',o.book_id);
       ids=ids.filter(id=>!own.some(o=>o.book_id===id))}
     cartIds=[...new Set(ids)];
@@ -1237,6 +1242,7 @@ actions.cpdel=async b=>{
 
 // ---- mega menu "Mais" (topo, só no computador) ----
 const megaT=(h,i,t,s)=>`<a class="mg-i" href="${h}"><i>${svgI(DI[i])}</i><span><b>${t}</b><small>${s}</small></span></a>`;
+const megaB=()=>`<details class="mega"><summary>Categorias${CHEV}</summary><div class="mega-p two"><div><h5>Vitrines</h5>${megaT('#/catalogo?f=lan','spark','Lançamentos','Novidades da Thau Luna')}${megaT('#/catalogo?f=dis','book','Disponíveis','Prontos para comprar')}${megaT('#/catalogo?f=brev','shelf','Em breve','O que vem por aí')}</div><div class="mg-s"><h5>Gêneros</h5>${GEN.map(g=>`<a class="mg-l" href="#/catalogo?g=${encodeURIComponent(g)}">${esc(g)}</a>`).join('')}<a class="mg-l" href="#/catalogo">Catálogo completo</a></div></div></details>`;
 const megaH=()=>`<details class="mega"><summary>Mais${CHEV}</summary><div class="mega-p"><div><h5>Ler</h5>${megaT('#/catalogo','book','Catálogo','Todos os livros')}${megaT('#/descobrir','spark','Descobrir','Universos, quizzes e mais')}${user?megaT('#/minha-estante','shelf','Minha estante','Seus livros e progresso'):''}</div><div><h5>A autora</h5>${megaT('#/sobre','author','Sobre','Conheça a Thau Luna')}${megaT('#/blog','blog','Blog','Novidades e bastidores')}</div><div class="mg-s"><h5>Informações</h5><a class="mg-l" href="#/politicas">Termos e Políticas</a><a class="mg-l" href="#/privacidade">Privacidade</a><a class="mg-l" href="#/compra">Compra e Reembolso</a><a class="mg-l" href="mailto:${CONTATO}">Fale com a gente</a>${user?'':'<a class="btn" href="#/cadastro">Criar conta</a>'}</div></div></details>`;
 document.addEventListener('click',e=>{const d=document.querySelector('.mega[open]');if(d&&(!d.contains(e.target)||e.target.closest('.mega-p a')))d.open=false});
 // ---- cupom no carrinho, aviso de primeira compra, Como funciona e Dúvidas ----
@@ -1303,3 +1309,6 @@ addEventListener('hashchange',route);
 sb.auth.onAuthStateChange((ev,s)=>{const id=s?.user?.id;if(ev==='PASSWORD_RECOVERY'){user=s.user;header();return novaSenha()}
   if(ev==='INITIAL_SESSION'||id!==user?.id){user=s?.user||null;isAdmin=false;const uid=user?.id;roleP=uid?sb.from('user_roles').select('role').eq('user_id',uid).eq('role','admin').maybeSingle().then(({data})=>{if(user?.id===uid){isAdmin=!!data;header()}},()=>{}):Promise.resolve();loadProf();const th=user?.user_metadata?.theme;if(['light','dark','sepia'].includes(th))applyTheme(th);cartP=loadCart();route()}});
 setTimeout(()=>{if(!app.innerHTML.trim())route()},3000);
+
+// ---- card do catálogo: adicionar ao carrinho sem recarregar (mantém filtros e busca) ----
+actions.cartquick=async b=>{await cartAdd(b.dataset.id);toast('Livro adicionado ao carrinho.');const a=document.createElement('a');a.className='btn alt sm bk-add';a.href='#/carrinho';a.textContent='No carrinho';b.replaceWith(a)};
